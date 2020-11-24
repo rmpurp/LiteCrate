@@ -10,10 +10,10 @@ import Combine
 import FMDB
 
 public protocol DatabaseFetchable {
-  mutating func decodeValue(propertyName: String, resultSet: FMResultSet) throws
+  func decodeValue(propertyName: String, resultSet: FMResultSet) throws
 }
 
-protocol ColumnObservable: AnyObject {
+internal protocol ColumnObservable: AnyObject {
   var objectWillChange: ObservableObjectPublisher { get }
 }
 
@@ -74,6 +74,5 @@ extension Column: DatabaseFetchable {
     default:
       fatalError()
     }
-    
   }
 }
