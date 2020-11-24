@@ -9,7 +9,7 @@ import Foundation
 import Combine
 import FMDB
 
-public class RPModel: ObservableObject {
+open class RPModel: ObservableObject {
   //  static func register(tableName: String) {}
   //  static func notify(tableName: String) {}
   
