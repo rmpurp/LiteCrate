@@ -9,9 +9,15 @@ import Foundation
 import Combine
 import FMDB
 
+func testType<T>(_ value: Any, is type_: T.Type) -> Bool {
+  return type(of: value) == T.self
+}
+
 public protocol DatabaseFetchable {
   func fetch(propertyName: String, resultSet: FMResultSet)
   func typeErasedValue() -> Any
+  var typeName: String { get }
+  var isOptional: Bool { get }
 }
 
 internal protocol ColumnObservable: AnyObject {
@@ -19,8 +25,10 @@ internal protocol ColumnObservable: AnyObject {
 }
 
 @propertyWrapper public final class Column<T>: ObservableObject, ColumnObservable {
-  var key: String?
   @Published private var _value: T?
+  
+  var key: String?
+  public var isOptional: Bool
   public var wrappedValue: T {
     get {
       return _value!
@@ -29,20 +37,52 @@ internal protocol ColumnObservable: AnyObject {
     }
   }
   
+  public var typeName: String {
+    let objectToConsider: Any = isOptional ? self._value! : self._value as Any
+    // TODO: Blob
+    if testType(objectToConsider, is: Int?.self)
+        || testType(objectToConsider, is: Int32?.self)
+        || testType(objectToConsider, is: Int64?.self)
+        || testType(objectToConsider, is: UInt64?.self)
+        || testType(objectToConsider, is: Bool?.self)
+    {
+      return "INTEGER"
+    } else if testType(objectToConsider, is: Double?.self) {
+      return "REAL"
+    } else if testType(objectToConsider, is: String?.self) {
+      return "TEXT"
+    } else if testType(objectToConsider, is: Date?.self) {
+      return "DATE"
+    } else {
+      fatalError("Unsupported type")
+    }
+  }
+  
+  
   public init(wrappedValue: T, _ key: String? = nil) {
     self.key = key
     self._value = wrappedValue
+    isOptional = false
   }
+  
+  public init(wrappedValue: T, _ key: String? = nil) where T: ExpressibleByNilLiteral {
+    self.key = key
+    self._value = wrappedValue
+    isOptional = true
+  }
+  
   
   public init(_ key: String? = nil) {
     self.key = key
     self._value = nil
+    isOptional = false
   }
   
   public init(_ key: String? = nil) where T: ExpressibleByNilLiteral {
     self.key = key
     let value: T = nil
     self._value = value
+    isOptional = true
   }
 }
 

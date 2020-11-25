@@ -3,7 +3,7 @@ import XCTest
 
 extension DispatchSemaphore {
   func waitABit() -> DispatchTimeoutResult {
-    return wait(timeout: DispatchTime.now().advanced(by: .milliseconds(500)))
+    return wait(timeout: DispatchTime.now().advanced(by: .seconds(5)))
   }
 
 }
@@ -44,6 +44,15 @@ final class RPModelTests: XCTestCase {
     RPModel.closeDatabase()
   }
   
+  func testCreateTableStatement() {
+    let acceptableOutputs = [
+      "CREATE TABLE Person ( id INTEGER PRIMARY KEY AUTOINCREMENT , name TEXT NOT NULL , birthday DATE , )",
+      "CREATE TABLE Person ( id INTEGER PRIMARY KEY AUTOINCREMENT , birthday DATE , name TEXT NOT NULL , )"
+
+    ]
+    XCTAssertTrue(acceptableOutputs.contains(Person.createTableStatement), Person.createTableStatement)
+  }
+  
   func testTableUpdatedPublisher() {
     let alice: Person = Person()
     alice.name = "Alice"
@@ -57,7 +66,7 @@ final class RPModelTests: XCTestCase {
       }
     
     alice.save()
-    _ = semaphore.wait(timeout: DispatchTime.now().advanced(by: .milliseconds(500)))
+    XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertTrue(personDidFire)
     
     personDidFire = false

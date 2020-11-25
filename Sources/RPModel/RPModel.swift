@@ -51,6 +51,7 @@ extension DatabaseFetcher {
     return returnValue
   }
   
+ 
   /// Fetches the instance with the given primary key. Although the database access is done on a separate thread, this method
   /// blocks until the database operation is complete.
   /// - Parameter primaryKey: database primary key
@@ -121,6 +122,40 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
     } else {
       operation(db)
     }
+  }
+  
+  public static var createTableStatement: String {
+    let model = Self()
+    var creationStringComponents = ["CREATE TABLE",
+                                    Self.tableName,
+                                    "(",
+                                    "id INTEGER PRIMARY KEY AUTOINCREMENT",
+                                    ","
+    ]
+    
+    var mirror: Mirror? = Mirror(reflecting: model)
+    repeat {
+      guard let children = mirror?.children else { break }
+      
+      for child in children {
+        guard let column = child.value as? DatabaseFetchable else { continue }
+        let propertyName = String((child.label ?? "").dropFirst())
+
+        if propertyName == "id" {
+          continue
+        }
+        creationStringComponents.append(propertyName)
+        creationStringComponents.append(column.typeName)
+        if !column.isOptional {
+          creationStringComponents.append("NOT NULL")
+        }
+        
+        creationStringComponents.append(",")
+      }
+      mirror = mirror?.superclassMirror
+    } while mirror != nil
+    creationStringComponents.append(")")
+    return creationStringComponents.joined(separator: " ")
   }
   
   @Column public var id: Int64!
