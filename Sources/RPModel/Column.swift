@@ -10,7 +10,8 @@ import Combine
 import FMDB
 
 public protocol DatabaseFetchable {
-  func decodeValue(propertyName: String, resultSet: FMResultSet) throws
+  func fetch(propertyName: String, resultSet: FMResultSet)
+  func typeErasedValue() -> Any
 }
 
 internal protocol ColumnObservable: AnyObject {
@@ -43,11 +44,14 @@ internal protocol ColumnObservable: AnyObject {
     let value: T = nil
     self._value = value
   }
-  
 }
 
 extension Column: DatabaseFetchable {
-  public func decodeValue(propertyName: String, resultSet: FMResultSet) throws {
+  public func typeErasedValue() -> Any {
+    return self.wrappedValue
+  }
+  
+  public func fetch(propertyName: String, resultSet: FMResultSet) {
     let column = key ?? propertyName
     
     //    if let value = try? container.decode(T.self, forKey: codingKey) {
