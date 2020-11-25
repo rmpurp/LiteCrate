@@ -130,7 +130,6 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
                                     Self.tableName,
                                     "(",
                                     "id INTEGER PRIMARY KEY AUTOINCREMENT",
-                                    ","
     ]
     
     var mirror: Mirror? = Mirror(reflecting: model)
@@ -144,13 +143,14 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
         if propertyName == "id" {
           continue
         }
+        
+        creationStringComponents.append(",")
         creationStringComponents.append(propertyName)
         creationStringComponents.append(column.typeName)
         if !column.isOptional {
           creationStringComponents.append("NOT NULL")
         }
         
-        creationStringComponents.append(",")
       }
       mirror = mirror?.superclassMirror
     } while mirror != nil

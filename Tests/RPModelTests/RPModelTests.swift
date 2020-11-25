@@ -46,8 +46,8 @@ final class RPModelTests: XCTestCase {
   
   func testCreateTableStatement() {
     let acceptableOutputs = [
-      "CREATE TABLE Person ( id INTEGER PRIMARY KEY AUTOINCREMENT , name TEXT NOT NULL , birthday DATE , )",
-      "CREATE TABLE Person ( id INTEGER PRIMARY KEY AUTOINCREMENT , birthday DATE , name TEXT NOT NULL , )"
+      "CREATE TABLE Person ( id INTEGER PRIMARY KEY AUTOINCREMENT , name TEXT NOT NULL , birthday DATE )",
+      "CREATE TABLE Person ( id INTEGER PRIMARY KEY AUTOINCREMENT , birthday DATE , name TEXT NOT NULL )"
 
     ]
     XCTAssertTrue(acceptableOutputs.contains(Person.createTableStatement), Person.createTableStatement)
