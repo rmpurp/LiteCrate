@@ -13,7 +13,7 @@ import SQLite3
 
 /// Disgusting hack in order to have more flexibility in returning Self-related return values.
 /// Everything declared here is minimum-viable implementations to implement methods in the protocol extension.
-protocol DatabaseFetcher {
+public protocol DatabaseFetcher {
   init()
 }
 
