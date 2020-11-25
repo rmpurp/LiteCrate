@@ -260,6 +260,16 @@ extension RPModel {
     try database.executeUpdate("DELETE FROM schema", values: nil)
     try database.executeUpdate("INSERT INTO schema VALUES (?)", values: [version])
   }
-  
+}
 
+extension RPModel: Hashable {
+  public static func == (lhs: RPModel, rhs: RPModel) -> Bool {
+    return lhs.id == rhs.id
+  }
+  
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(id)
+  }
+  
+  
 }
