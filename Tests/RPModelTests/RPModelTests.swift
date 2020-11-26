@@ -65,12 +65,12 @@ final class RPModelTests: XCTestCase {
         semaphore.signal()
       }
     
-    alice.save()
+    alice.save(waitUntilComplete: true)
     XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertTrue(personDidFire)
     
     personDidFire = false
-    alice.save()
+    alice.save(waitUntilComplete: true)
     XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertTrue(personDidFire)
     
@@ -84,7 +84,7 @@ final class RPModelTests: XCTestCase {
         dogDidFire = true
         semaphore.signal()
       }
-    fido.save()
+    fido.save(waitUntilComplete: true)
     XCTAssertEqual(semaphore.waitABit(), .success)
 
     XCTAssertFalse(personDidFire)

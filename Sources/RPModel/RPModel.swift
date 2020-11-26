@@ -98,8 +98,7 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
   static var instances: [String: NSMapTable<NSNumber, RPModel>] = [String: NSMapTable<NSNumber, RPModel>]()
   
   public static func inTransaction(operation: @escaping (FMDatabase) throws -> Void, waitUntilComplete: Bool = false) {
-    let semaphore = DispatchSemaphore(value: 0)
-    inDatabase { (db) in
+    inDatabase(operation: { db in
       db.beginDeferredTransaction()
       do {
         try operation(db)
@@ -107,17 +106,25 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
         db.rollback()
       }
       db.commit()
-      
-      semaphore.signal()
-    }
-    if waitUntilComplete { semaphore.wait() }
+    }, waitUntilComplete: waitUntilComplete)
+//    let semaphore = DispatchSemaphore(value: 0)
+//    inDatabase { (db) in
+//      
+//      semaphore.signal()
+//    }
+//    if waitUntilComplete { semaphore.wait() }
   }
   
-  public static func inDatabase(operation: @escaping (FMDatabase) -> Void) {
+  public static func inDatabase(operation: @escaping (FMDatabase) -> Void, waitUntilComplete: Bool = false) {
     if Thread.isMainThread {
-      queue.async {
-        operation(db)
-
+      if waitUntilComplete {
+        queue.sync {
+          operation(db)
+        }
+      } else {
+        queue.async {
+          operation(db)
+        }
       }
     } else {
       operation(db)
@@ -221,7 +228,7 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
     let placeholders = String(String(repeating: "?,", count: columnsToValue.count).dropLast())
     let values = columns.map { columnsToValue[$0]! }
     
-    RPModel.inTransaction(operation: { (db) in
+    RPModel.inDatabase(operation: { (db) in
       try! db.executeUpdate("INSERT OR REPLACE INTO \(Self.tableName)(\(columnString)) VALUES (\(placeholders)) ", values: values)
       if self.id == nil {
         self.id = db.lastInsertRowId
