@@ -58,7 +58,6 @@ internal protocol ColumnObservable: AnyObject {
     }
   }
   
-  
   public init(wrappedValue: T, _ key: String? = nil) {
     self.key = key
     self._value = wrappedValue

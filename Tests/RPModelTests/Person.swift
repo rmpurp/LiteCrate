@@ -12,7 +12,5 @@ class Person: RPModel {
   @Column var name: String
   @Column var birthday: Date?
   
-  class override var tableName: String { "Person" }
-  
-  required init() { }  
+  required init() { }
 }

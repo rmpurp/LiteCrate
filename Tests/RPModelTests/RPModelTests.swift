@@ -5,20 +5,18 @@ extension DispatchSemaphore {
   func waitABit() -> DispatchTimeoutResult {
     return wait(timeout: DispatchTime.now().advanced(by: .seconds(5)))
   }
-
 }
 
 final class RPModelTests: XCTestCase {
-  
   private let date1 = Date(timeIntervalSince1970: 123456789)
   
   override func setUp() {
     RPModel.closeDatabase()
-    RPModel.openDatabase(at: nil) { [self] (db, currentVersion) in
+    RPModel.openDatabase(at: nil) { (db, currentVersion) in
       if currentVersion < 0 {
         try db.executeUpdate("""
           CREATE TABLE Person (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              id INTEGER PRIMARY KEY,
               name TEXT NOT NULL,
               birthday DATE
           )
@@ -26,16 +24,12 @@ final class RPModelTests: XCTestCase {
 
         try db.executeUpdate("""
           CREATE TABLE Dog (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              id INTEGER PRIMARY KEY,
               name TEXT NOT NULL,
               owner INTEGER,
               FOREIGN KEY (owner) REFERENCES Person(id)
           )
         """, values: nil)
-        
-        try db.executeUpdate("""
-          INSERT INTO Person values (1, "Bob", ?), (2, "Carol", NULL)
-        """, values: [date1])
       }
     }
   }
@@ -44,13 +38,33 @@ final class RPModelTests: XCTestCase {
     RPModel.closeDatabase()
   }
   
+  func testDelete() {
+    createFixtures()
+    let bob = Person.fetch(with: 1)!
+    XCTAssertFalse(bob.isDeleted)
+    bob.delete(waitUntilComplete: true)
+    XCTAssertTrue(bob.isDeleted)
+    XCTAssertNil(Person.fetch(with: 1))
+    XCTAssertEqual(Person.fetchAll().count, 1)
+  }
+  
   func testCreateTableStatement() {
     let acceptableOutputs = [
-      "CREATE TABLE Person ( id INTEGER PRIMARY KEY AUTOINCREMENT , name TEXT NOT NULL , birthday DATE )",
-      "CREATE TABLE Person ( id INTEGER PRIMARY KEY AUTOINCREMENT , birthday DATE , name TEXT NOT NULL )"
+      "CREATE TABLE Person ( id INTEGER PRIMARY KEY , name TEXT NOT NULL , birthday DATE )",
+      "CREATE TABLE Person ( id INTEGER PRIMARY KEY , birthday DATE , name TEXT NOT NULL )"
 
     ]
     XCTAssertTrue(acceptableOutputs.contains(Person.createTableStatement), Person.createTableStatement)
+  }
+  
+  func createFixtures() {
+    let bob = Person()
+    bob.name = "Bob"
+    bob.birthday = date1
+    bob.save(waitUntilComplete: true)
+    let carol = Person()
+    carol.name = "Carol"
+    carol.save(waitUntilComplete: true)
   }
   
   func testTableUpdatedPublisher() {
@@ -66,12 +80,14 @@ final class RPModelTests: XCTestCase {
       }
     
     alice.save(waitUntilComplete: true)
-    XCTAssertEqual(semaphore.waitABit(), .success)
+    semaphore.wait()
+//    XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertTrue(personDidFire)
     
     personDidFire = false
     alice.save(waitUntilComplete: true)
-    XCTAssertEqual(semaphore.waitABit(), .success)
+    semaphore.wait()
+//    XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertTrue(personDidFire)
     
     // Try inserting another object, make sure person publisher does not fire
@@ -95,6 +111,7 @@ final class RPModelTests: XCTestCase {
   }
   
   func testPublisherAll() {
+    createFixtures()
     let semaphore = DispatchSemaphore(value: 0)
     var expectedIDs: Set<Int64> = [1, 2]
     var fetchedPeople: [Person] = []
@@ -132,12 +149,12 @@ final class RPModelTests: XCTestCase {
     let alice: Person! = Person()
     alice.name = "Alice"
     alice.save(waitUntilComplete: true)
-    XCTAssertEqual(alice.id, 3)
+    XCTAssertEqual(alice.id, 1)
     XCTAssertEqual(alice.name, "Alice")
     XCTAssertEqual(alice.birthday, nil)
     
-    let alice2 = Person.fetch(with: 3)!
-    XCTAssertEqual(alice2.id, 3)
+    let alice2 = Person.fetch(with: 1)!
+    XCTAssertEqual(alice2.id, 1)
     XCTAssertEqual(alice2.name, "Alice")
     XCTAssertEqual(alice2.birthday, nil)
     XCTAssertTrue(alice === alice2)    
@@ -147,22 +164,23 @@ final class RPModelTests: XCTestCase {
     var alice: Person! = Person()
     alice.name = "Alice"
     alice.save(waitUntilComplete: true)
-    XCTAssertEqual(alice.id, 3)
+    XCTAssertEqual(alice.id, 1)
     XCTAssertEqual(alice.name, "Alice")
     XCTAssertEqual(alice.birthday, nil)
     alice = nil // dealloc so we fetch a fresh copy
     
     
-    let alice2 = Person.fetch(with: 3)!
-    XCTAssertEqual(alice2.id, 3)
+    let alice2 = Person.fetch(with: 1)!
+    XCTAssertEqual(alice2.id, 1)
     XCTAssertEqual(alice2.name, "Alice")
     XCTAssertEqual(alice2.birthday, nil)
     
-    let alice3 = Person.fetch(with: 3)!
+    let alice3 = Person.fetch(with: 1)!
     XCTAssertTrue(alice2 === alice3)
   }
   
   func testFetch() {
+    createFixtures()
     let bob = Person.fetch(with: 1)
     let carol = Person.fetch(with: 2)
     XCTAssertNotNil(bob)

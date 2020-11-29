@@ -9,7 +9,6 @@ import Foundation
 import RPModel
 
 class Dog: RPModel {
-  class override var tableName: String { "Dog" }
   @Column var name: String
   @Column var owner: Int64
   
