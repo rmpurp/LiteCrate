@@ -11,8 +11,8 @@ import FMDB
 import SQLite3
 import ObjectiveC
 
+
 /// Disgusting hack in order to have more flexibility in returning Self-related return values.
-/// Everything declared here is minimum-viable implementations to implement methods in the protocol extension.
 public protocol DatabaseFetcher {
   init()
 }
@@ -27,7 +27,7 @@ extension DatabaseFetcher {
     return Self.fetchAll(forAllWhere: "id = ?", values: [primaryKey]).first
   }
   
-
+  
   /// Blocking call to fetch
   public static func fetchAll(forAllWhere sqlWhereClause: String? = nil, values: [Any]? = nil) -> [Self] where Self: RPModel {
     // TODO: Properly rewrite query if where clause is null
@@ -50,6 +50,7 @@ extension DatabaseFetcher {
           returnValue.append(model)
         } else {
           let model = Self()
+          
           model.populate(resultSet: rs)
           returnValue.append(model)
           Self.storeInstance(model: model, tableName: Self.tableName)
@@ -60,8 +61,10 @@ extension DatabaseFetcher {
     semaphore.wait()
     return returnValue
   }
-  
-  
+}
+
+// MARK: - Publishers
+extension DatabaseFetcher {
   internal static func tableUpdatedPublisher() -> AnyPublisher<Void, Never> where Self: RPModel {
     RPModel.tableChangedPublisher
       .filter { $0 == Self.tableName }
@@ -84,17 +87,16 @@ extension DatabaseFetcher {
 }
 
 open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
-
-
+  // MARK: - Properties
   private(set) var isDeleted: Bool = false
   private(set) var isDirty: Bool = false
-
+  
   private static var db: FMDatabase!
   @Column public var id: Int64!
   
   /// Publishes the name of a table which had an update/insert/delete
   fileprivate static var tableChangedPublisher = PassthroughSubject<String, Never>()
-
+  
   // Override to set name different than class name
   open class var tableName: String {
     String(NSStringFromClass(self).split(separator: ".").last!)
@@ -106,11 +108,11 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
     attributes: [],
     autoreleaseFrequency: .workItem,
     target: nil)
-
+  
   private var subscriptions: Set<AnyCancellable> = []
   
-  static var instances: [String: NSMapTable<NSNumber, RPModel>] = [String: NSMapTable<NSNumber, RPModel>]()
-    
+  fileprivate static var instances: [String: NSMapTable<NSNumber, RPModel>] = [String: NSMapTable<NSNumber, RPModel>]()
+  
   public static var createTableStatement: String {
     let model = Self()
     var creationStringComponents = ["CREATE TABLE",
@@ -118,35 +120,20 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
                                     "(",
                                     "id INTEGER PRIMARY KEY",
     ]
-    
-    var mirror: Mirror? = Mirror(reflecting: model)
-    repeat {
-      guard let children = mirror?.children else { break }
+    for (label, column) in model.labeledColumns {
+      guard label != "id" else { continue }
       
-      for child in children {
-        guard let column = child.value as? DatabaseFetchable else { continue }
-        let propertyName = String((child.label ?? "").dropFirst())
-        
-        if propertyName == "id" {
-          continue
-        }
-        
-        creationStringComponents.append(",")
-        creationStringComponents.append(propertyName)
-        creationStringComponents.append(column.typeName)
-        if !column.isOptional {
-          creationStringComponents.append("NOT NULL")
-        }
-        
-      }
-      mirror = mirror?.superclassMirror
-    } while mirror != nil
+      creationStringComponents.append(",")
+      creationStringComponents.append(label)
+      creationStringComponents.append(column.typeName)
+      creationStringComponents.append(column.isOptional ? "" : "NOT NULL")
+    }
     creationStringComponents.append(")")
     return creationStringComponents.joined(separator: " ")
   }
   
-    
-  static func storeInstance(model: RPModel?, tableName: String) {
+  
+  fileprivate static func storeInstance(model: RPModel?, tableName: String) {
     guard let model = model, let primaryKey = model.id else { return }
     let dict: NSMapTable<NSNumber, RPModel>
     
@@ -158,36 +145,19 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
     }
     dict.setObject(model, forKey: primaryKey as NSNumber)
   }
-    
+  
   fileprivate func populate(resultSet: FMResultSet) {
-    var mirror: Mirror? = Mirror(reflecting: self)
-    repeat {
-      guard let children = mirror?.children else { break }
-      
-      for child in children {
-        guard let column = child.value as? DatabaseFetchable else { continue }
-        let propertyName = String((child.label ?? "").dropFirst())
-        
-        column.fetch(propertyName: propertyName, resultSet: resultSet)
-      }
-      mirror = mirror?.superclassMirror
-    } while mirror != nil
+    for (label, column) in labeledColumns {
+      column.fetch(propertyName: label, resultSet: resultSet)
+    }
   }
   
   public func save(waitUntilComplete: Bool = false) {
     var columnsToValue = [String: Any]()
-    var mirror: Mirror? = Mirror(reflecting: self)
-    repeat {
-      guard let children = mirror?.children else { break }
-      
-      for child in children {
-        guard let column = child.value as? DatabaseFetchable else { continue }
-        
-        let propertyName = String((child.label ?? "").dropFirst())
-        columnsToValue[propertyName] = column.typeErasedValue()
-      }
-      mirror = mirror?.superclassMirror
-    } while mirror != nil
+    for (label, column) in labeledColumns {
+      columnsToValue[label] = column.typeErasedValue()
+    }
+    
     let columns = [String](columnsToValue.keys)
     let columnString = columns.joined(separator: ",")
     let placeholders = String(String(repeating: "?,", count: columnsToValue.count).dropLast())
@@ -201,28 +171,24 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
       Self.storeInstance(model: self, tableName: Self.tableName)
     }, waitUntilComplete: waitUntilComplete)
   }
-    
+  
   public func delete(waitUntilComplete: Bool = false) {
     RPModel.inDatabase(operation: { [id] db in
       guard let id = id else { return }
       try! db.executeUpdate("DELETE FROM \(Self.tableName) WHERE id = ?", values: [id])
       self.isDeleted = true
-
+      
     }, waitUntilComplete: waitUntilComplete)
   }
-    
+  
+  
+  private var _objectWillChange: ObservableObjectPublisher?
+  
   required public init() {
     _ = Self.tableName
-    let mirror = Mirror(reflecting: self)
-    mirror.children.forEach { child in
-      if let observedProperty = child.value as? ColumnObservable {
-        observedProperty.objectWillChange.sink { [weak self] _ in
-          self?.objectWillChange.send()
-        }.store(in: &subscriptions)
-      }
-    }
   }
 }
+
 
 // MARK: - Database Operations
 extension RPModel {
@@ -313,5 +279,59 @@ extension RPModel: Hashable {
   
   public func hash(into hasher: inout Hasher) {
     hasher.combine(id)
+  }
+}
+
+// MARK: - Column Introspection
+
+private struct PropertyIterator: IteratorProtocol {
+  var currentMirror: Mirror
+  var currentChildIterator: AnyIterator<Mirror.Child>
+  init(mirror: Mirror) {
+    self.currentMirror = mirror
+    self.currentChildIterator = mirror.children.makeIterator()
+  }
+  
+  mutating func next() -> Mirror.Child? {
+    if let nextElem = currentChildIterator.next() {
+      return nextElem
+    }
+    
+    guard let nextMirror = currentMirror.superclassMirror else { return nil }
+    currentChildIterator = nextMirror.children.makeIterator()
+    currentMirror = nextMirror
+    
+    return next()
+  }
+}
+
+extension RPModel {
+  private var labeledColumns: AnyIterator<(String, ColumnProtocol)> {
+    let mirror = Mirror(reflecting: self)
+    let propertyIterator = AnyIterator(PropertyIterator(mirror: mirror))
+    let columnIterator = propertyIterator.lazy
+      .map { child -> (String, ColumnProtocol)? in
+        guard let column = child.value as? ColumnProtocol,
+              let label = child.label?.dropFirst() else { return nil }
+        return (column.key ?? String(label), column)
+      }
+      .compactMap { $0 }
+      .makeIterator()
+    return AnyIterator(columnIterator)
+  }
+
+  public var objectWillChange: ObservableObjectPublisher {
+    // https://forums.swift.org/t/question-about-valid-uses-of-observableobject-s-synthesized-objectwillchange/31141/2
+    if let objectWillChange = _objectWillChange {
+      return objectWillChange
+    }
+    
+    // Not initialized yet; install into columns.
+    let observableObjectPublisher = ObservableObjectPublisher()
+    for (_, column) in labeledColumns {
+      column.objectWillChange = observableObjectPublisher
+    }
+    _objectWillChange = observableObjectPublisher
+    return observableObjectPublisher
   }
 }

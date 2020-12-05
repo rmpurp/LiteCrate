@@ -50,9 +50,8 @@ final class RPModelTests: XCTestCase {
   
   func testCreateTableStatement() {
     let acceptableOutputs = [
-      "CREATE TABLE Person ( id INTEGER PRIMARY KEY , name TEXT NOT NULL , birthday DATE )",
-      "CREATE TABLE Person ( id INTEGER PRIMARY KEY , birthday DATE , name TEXT NOT NULL )"
-
+      "CREATE TABLE Person ( id INTEGER PRIMARY KEY , name TEXT NOT NULL , birthday DATE  )",
+      "CREATE TABLE Person ( id INTEGER PRIMARY KEY , birthday DATE  , name TEXT NOT NULL )",
     ]
     XCTAssertTrue(acceptableOutputs.contains(Person.createTableStatement), Person.createTableStatement)
   }
@@ -198,8 +197,5 @@ final class RPModelTests: XCTestCase {
   
   static var allTests = [
     ("testFetch", testFetch),
-    ("testFetch", testSave),
-    ("testFetch", testConsistentFetchAfterSave),
-    
   ]
 }

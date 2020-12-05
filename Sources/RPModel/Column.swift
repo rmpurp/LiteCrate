@@ -9,52 +9,60 @@ import Foundation
 import Combine
 import FMDB
 
-func testType<T>(_ value: Any, is type_: T.Type) -> Bool {
-  return type(of: value) == T.self
+internal enum SQLType {
+  case bool, string, double, int, int32, int64, uint64, date
 }
 
-public protocol DatabaseFetchable {
+internal protocol ColumnProtocol: AnyObject {
   func fetch(propertyName: String, resultSet: FMResultSet)
   func typeErasedValue() -> Any
   var typeName: String { get }
   var isOptional: Bool { get }
+  var key: String? { get }
+
+  var objectWillChange: ObservableObjectPublisher? { set get }
 }
 
-internal protocol ColumnObservable: AnyObject {
-  var objectWillChange: ObservableObjectPublisher { get }
-}
+@propertyWrapper public final class Column<T>: ColumnProtocol {
+  private var _value: T?
+  weak var objectWillChange: ObservableObjectPublisher? = nil
+  var key: String? = nil
 
-@propertyWrapper public final class Column<T>: ObservableObject, ColumnObservable {
-  @Published private var _value: T?
-  
-  var key: String?
   public var isOptional: Bool
   public var wrappedValue: T {
     get {
       return _value!
     } set {
+      objectWillChange?.send()
       _value = newValue
     }
   }
   
+  
+  var sqlType: SQLType {
+    switch (T.self) {
+    case is Bool.Type, is Bool?.Type: return .bool
+    case is String.Type, is String?.Type: return .string
+    case is Double.Type, is Double?.Type: return .double
+    case is Int.Type, is Int?.Type: return .int
+    case is Int32.Type, is Int32?.Type: return .int32
+    case is Int64.Type, is Int64?.Type: return .int64
+    case is UInt64.Type, is UInt64?.Type: return .uint64
+    case is Date.Type, is Date?.Type: return .date
+    default: fatalError("Invalid type")
+    }
+  }
+  
   public var typeName: String {
-    let objectToConsider: Any = isOptional ? self._value! : self._value as Any
-    // TODO: Blob
-    if testType(objectToConsider, is: Int?.self)
-        || testType(objectToConsider, is: Int32?.self)
-        || testType(objectToConsider, is: Int64?.self)
-        || testType(objectToConsider, is: UInt64?.self)
-        || testType(objectToConsider, is: Bool?.self)
-    {
+    switch (sqlType) {
+    case .int, .int32, .int64, .uint64, .bool:
       return "INTEGER"
-    } else if testType(objectToConsider, is: Double?.self) {
+    case .double:
       return "REAL"
-    } else if testType(objectToConsider, is: String?.self) {
+    case .string:
       return "TEXT"
-    } else if testType(objectToConsider, is: Date?.self) {
+    case .date:
       return "DATE"
-    } else {
-      fatalError("Unsupported type")
     }
   }
   
@@ -85,37 +93,24 @@ internal protocol ColumnObservable: AnyObject {
   }
 }
 
-extension Column: DatabaseFetchable {
-  public func typeErasedValue() -> Any {
+extension Column {
+  internal func typeErasedValue() -> Any {
     return self.wrappedValue
   }
   
-  public func fetch(propertyName: String, resultSet: FMResultSet) {
+  internal func fetch(propertyName: String, resultSet: FMResultSet) {
     let column = key ?? propertyName
     
-    //    if let value = try? container.decode(T.self, forKey: codingKey) {
-    //      wrappedValue = value
-    switch T.self {
-    case is Bool.Type, is Bool?.Type: wrappedValue = resultSet.bool(forColumn: column) as! T
-    case is String.Type: wrappedValue = resultSet.string(forColumn: column) as! T
-    case is Double.Type: wrappedValue = resultSet.double(forColumn: column) as! T
-    case is Int.Type: wrappedValue = resultSet.long(forColumn: column) as! T
-    case is Int32.Type: wrappedValue = resultSet.int(forColumn: column) as! T
-    case is Int64.Type: wrappedValue = resultSet.longLongInt(forColumn: column) as! T
-    case is UInt64.Type: wrappedValue = resultSet.unsignedLongLongInt(forColumn: column) as! T
-    case is Date.Type: wrappedValue = resultSet.date(forColumn: column)! as! T
-      
-    case is String?.Type: wrappedValue = resultSet.string(forColumn: column) as! T
-    case is Double?.Type: wrappedValue = resultSet.double(forColumn: column) as! T
-    case is Int?.Type: wrappedValue = resultSet.long(forColumn: column) as! T
-    case is Int32?.Type: wrappedValue = resultSet.int(forColumn: column) as! T
-    case is Int64?.Type: wrappedValue = resultSet.longLongInt(forColumn: column) as! T
-    case is UInt64?.Type: wrappedValue = resultSet.unsignedLongLongInt(forColumn: column) as! T
-    case is Date?.Type: wrappedValue = resultSet.date(forColumn: column) as! T
-      
+    switch self.sqlType {
+    case .bool: wrappedValue = resultSet.bool(forColumn: column) as! T
+    case .string: wrappedValue = resultSet.string(forColumn: column) as! T
+    case .double: wrappedValue = resultSet.double(forColumn: column) as! T
+    case .int: wrappedValue = resultSet.long(forColumn: column) as! T
+    case .int32: wrappedValue = resultSet.int(forColumn: column) as! T
+    case .int64: wrappedValue = resultSet.longLongInt(forColumn: column) as! T
+    case .uint64: wrappedValue = resultSet.unsignedLongLongInt(forColumn: column) as! T
+    case .date: wrappedValue = resultSet.date(forColumn: column) as! T
     //    case is UUID.Type: wrappedValue = UUID().uuid rs.data(forColumn: column)! as! T
-    default:
-      fatalError()
     }
   }
 }
