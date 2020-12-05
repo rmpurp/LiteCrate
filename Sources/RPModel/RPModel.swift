@@ -30,6 +30,7 @@ extension DatabaseFetcher {
 
   /// Blocking call to fetch
   public static func fetchAll(forAllWhere sqlWhereClause: String? = nil, values: [Any]? = nil) -> [Self] where Self: RPModel {
+    // TODO: Properly rewrite query if where clause is null
     let sqlWhereClause = sqlWhereClause ?? "1=1"
     var returnValue = [Self]()
     let semaphore = DispatchSemaphore(value: 0)
@@ -83,12 +84,30 @@ extension DatabaseFetcher {
 }
 
 open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
-  public enum ChangeType {
-    case insert, delete, update
+
+
+  private(set) var isDeleted: Bool = false
+  private(set) var isDirty: Bool = false
+
+  private static var db: FMDatabase!
+  @Column public var id: Int64!
+  
+  /// Publishes the name of a table which had an update/insert/delete
+  fileprivate static var tableChangedPublisher = PassthroughSubject<String, Never>()
+
+  // Override to set name different than class name
+  open class var tableName: String {
+    String(NSStringFromClass(self).split(separator: ".").last!)
   }
   
-  private static var db: FMDatabase!
-  fileprivate static let queue: DispatchQueue = DispatchQueue(label: "RPModelDispatchQueue", qos: .userInteractive, attributes: [], autoreleaseFrequency: .workItem, target: nil)
+  fileprivate static let queue: DispatchQueue = DispatchQueue(
+    label: "RPModelDispatchQueue",
+    qos: .userInteractive,
+    attributes: [],
+    autoreleaseFrequency: .workItem,
+    target: nil)
+
+  private var subscriptions: Set<AnyCancellable> = []
   
   static var instances: [String: NSMapTable<NSNumber, RPModel>] = [String: NSMapTable<NSNumber, RPModel>]()
     
@@ -126,11 +145,6 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
     return creationStringComponents.joined(separator: " ")
   }
   
-  @Column public var id: Int64!
-  
-  open class var tableName: String {
-    return String(NSStringFromClass(self).split(separator: ".").last!)
-  }
     
   static func storeInstance(model: RPModel?, tableName: String) {
     guard let model = model, let primaryKey = model.id else { return }
@@ -145,13 +159,6 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
     dict.setObject(model, forKey: primaryKey as NSNumber)
   }
     
-  public class func tableDidChange(type: ChangeType, row: Int64) { }
-  
-  private var subscriptions: Set<AnyCancellable> = []
-  
-  /// Publishes the name of a table which had an update/insert/delete
-  fileprivate static var tableChangedPublisher = PassthroughSubject<String, Never>()
-  
   fileprivate func populate(resultSet: FMResultSet) {
     var mirror: Mirror? = Mirror(reflecting: self)
     repeat {
@@ -194,10 +201,7 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
       Self.storeInstance(model: self, tableName: Self.tableName)
     }, waitUntilComplete: waitUntilComplete)
   }
-  
-  private(set) var isDeleted: Bool = false
-  private(set) var isDirty: Bool = false
-  
+    
   public func delete(waitUntilComplete: Bool = false) {
     RPModel.inDatabase(operation: { [id] db in
       guard let id = id else { return }

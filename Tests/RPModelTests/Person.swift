@@ -11,6 +11,4 @@ import RPModel
 class Person: RPModel {
   @Column var name: String
   @Column var birthday: Date?
-  
-  required init() { }
 }
