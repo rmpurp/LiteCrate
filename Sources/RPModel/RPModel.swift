@@ -70,7 +70,6 @@ extension DatabaseFetcher {
       .eraseToAnyPublisher()
   }
   
-  
   /// Creates a publisher that fetches all items that match the where condition given.
   /// - Parameter sqlWhereClause: SQL WHERE clause. If null, fetches all.
   /// - Returns: publisher that publishes the stuff.
@@ -84,13 +83,15 @@ extension DatabaseFetcher {
 }
 
 open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
-
-
+  // MARK: - Properties
   private(set) var isDeleted: Bool = false
   private(set) var isDirty: Bool = false
 
   private static var db: FMDatabase!
   @Column public var id: Int64!
+  
+  private var columns = CurrentValueSubject<[String : Any], Never>(Dictionary<String, Any>())
+  private var columnTypes = CurrentValueSubject<[String : Any], Never>(Dictionary<String, Any>())
   
   /// Publishes the name of a table which had an update/insert/delete
   fileprivate static var tableChangedPublisher = PassthroughSubject<String, Never>()
@@ -145,6 +146,7 @@ open class RPModel: ObservableObject, DatabaseFetcher, Identifiable {
     return creationStringComponents.joined(separator: " ")
   }
   
+  // MARK: - Database Interaction
     
   static func storeInstance(model: RPModel?, tableName: String) {
     guard let model = model, let primaryKey = model.id else { return }
