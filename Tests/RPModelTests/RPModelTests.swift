@@ -33,6 +33,15 @@ final class RPModelTests: XCTestCase {
                 FOREIGN KEY (owner) REFERENCES Person(id)
             )
           """, values: nil)
+        
+        try db.executeUpdate(
+          """
+            CREATE TABLE UUIDPerson (
+                id INTEGER PRIMARY KEY,
+                specialID TEXT NOT NULL
+            )
+          """, values: nil)
+
       }
     }
   }
@@ -145,6 +154,18 @@ final class RPModelTests: XCTestCase {
     for person in fetchedPeople {
       XCTAssertTrue(expectedIDs.contains(person.id))
     }
+  }
+  
+  func testFetchUUID() {
+    var person: UUIDPerson? = UUIDPerson()
+    let uuid = UUID()
+    person!.specialID = uuid
+    person!.save(waitUntilComplete: true)
+    let id = person?.id
+    person = nil // Deallocate
+    
+    let refetchedPerson = UUIDPerson.fetch(with: id!)!
+    XCTAssertEqual(refetchedPerson.specialID, uuid)
   }
 
   func testConsistentFetchAfterSave() {

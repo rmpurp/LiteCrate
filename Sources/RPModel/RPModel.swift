@@ -358,3 +358,8 @@ extension RPModel {
     return observableObjectPublisher
   }
 }
+
+protocol IDType { }
+extension String: IDType { }
+extension UUID: IDType { }
+extension Int64: IDType { }

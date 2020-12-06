@@ -15,22 +15,14 @@ func dynamicCast<T>(_ value: Any, to _: T.Type) -> T {
 
 internal enum SQLType {
   case bool(value: Bool?)
-  case
-    string(value: String?)
-  case
-    double(value: Double?)
-  case
-    int(value: Int?)
-  case
-    int32(value: Int32?)
-  case
-    int64(value: Int64?)
-  case
-    uint64(value: UInt64?)
-  case
-    date(value: Date?)
-  case
-    uuid(value: UUID?)
+  case string(value: String?)
+  case double(value: Double?)
+  case int(value: Int?)
+  case int32(value: Int32?)
+  case int64(value: Int64?)
+  case uint64(value: UInt64?)
+  case date(value: Date?)
+  case uuid(value: UUID?)
 }
 
 internal protocol ColumnProtocol: AnyObject {
@@ -39,7 +31,6 @@ internal protocol ColumnProtocol: AnyObject {
   var typeName: String { get }
   var isOptional: Bool { get }
   var key: String? { get }
-
   var objectWillChange: ObservableObjectPublisher? { set get }
 }
 
@@ -93,7 +84,7 @@ internal protocol ColumnProtocol: AnyObject {
     case .string:
       return "TEXT"
     case .uuid:
-      return "BLOB"
+      return "TEXT"
     }
   }
 
@@ -127,7 +118,7 @@ extension Column {
   internal func typeErasedValue() -> Any {
     switch sqlType {
     case .uuid(let uuid):
-      return uuid.flatMap { $0.data } as Any
+      return uuid.flatMap { $0.uuidString } as Any
     default:
       return self.wrappedValue
     }
@@ -146,22 +137,12 @@ extension Column {
     case .uint64: wrappedValue = resultSet.unsignedLongLongInt(forColumn: column) as! T
     case .date: wrappedValue = resultSet.date(forColumn: column) as! T
     case .uuid:
-      let data = resultSet.data(forColumn: column)! as NSData
-      var bytes = [UInt8](repeating: 0, count: data.length)
-      data.getBytes(&bytes, length: data.length * MemoryLayout<UInt8>.stride)
-      self.wrappedValue = NSUUID(uuidBytes: bytes) as! T
-
-    //      wrappedValue =
-    //    case is UUID.Type: wrappedValue = UUID().uuid rs.data(forColumn: column)! as! T
+      let fetchedUUID = resultSet.string(forColumn: column).flatMap { UUID(uuidString: $0) }
+      guard let uuid = fetchedUUID else {
+        fatalError("Malformed database: incorrect UUID")
+        // TODO: Change to some sort of exception.
+      }
+      wrappedValue = uuid as! T
     }
   }
-}
-
-extension UUID {
-  internal var bytes: [UInt8] {
-    let (u1, u2, u3, u4, u5, u6, u7, u8, u9, u10, u11, u12, u13, u14, u15, u16) = self.uuid
-    return [u1, u2, u3, u4, u5, u6, u7, u8, u9, u10, u11, u12, u13, u14, u15, u16]
-  }
-
-  internal var data: Data { Data(bytes) }
 }
