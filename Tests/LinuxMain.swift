@@ -1,6 +1,5 @@
-import XCTest
-
 import RPModelTests
+import XCTest
 
 var tests = [XCTestCaseEntry]()
 tests += RPModelTests.allTests()

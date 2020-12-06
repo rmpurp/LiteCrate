@@ -13,13 +13,13 @@ let package = Package(
     // Products define the executables and libraries a package produces, and make them visible to other packages.
     .library(
       name: "RPModel",
-      targets: ["RPModel"]),
+      targets: ["RPModel"])
   ],
   dependencies: [
     .package(
       name: "FMDB",
       url: "https://github.com/ccgus/fmdb",
-      .upToNextMinor(from: "2.7.7")),
+      .upToNextMinor(from: "2.7.7"))
 
   ],
   targets: [
