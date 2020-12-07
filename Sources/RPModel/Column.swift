@@ -13,7 +13,7 @@ func dynamicCast<T>(_ value: Any, to _: T.Type) -> T {
   return value as! T
 }
 
-internal enum SQLType {
+internal enum SQLType: Equatable {
   case bool(value: Bool?)
   case string(value: String?)
   case double(value: Double?)
@@ -42,11 +42,11 @@ internal protocol ColumnProtocol {
   var sqlType: SQLType { get }
 }
 
-@propertyWrapper public struct Column<T>: ColumnProtocol {
-  internal var _value: Ref<T?>
+@propertyWrapper public struct Column<Value>: ColumnProtocol {
+  internal var _value: Ref<Value?>
   var key: String? = nil
 
-  public var wrappedValue: T {
+  public var wrappedValue: Value {
     get {
       guard let value = _value.val else { fatalError("Column is uninitialized before use") }
       return value
@@ -59,13 +59,13 @@ internal protocol ColumnProtocol {
       }
     }
   }
-  
+
   func unsafeSetRefValue(to value: Any) {
-    self._value.val = dynamicCast(value, to: T.self)
+    self._value.val = dynamicCast(value, to: Value.self)
   }
 
   var sqlType: SQLType {
-    switch T.self {
+    switch Value.self {
     case is Bool.Type, is Bool?.Type:
       return .bool(value: dynamicCast(_value.val ?? Bool?.none as Any, to: Bool?.self))
     case is String.Type, is String?.Type:
@@ -88,26 +88,46 @@ internal protocol ColumnProtocol {
     }
   }
 
-  public init(wrappedValue: T, _ key: String? = nil) {
-    self.key = key
+  public init(wrappedValue: Value) {
+    self.key = nil
     self._value = Ref(wrappedValue)
   }
 
-  public init(wrappedValue: T, _ key: String? = nil) where T: ExpressibleByNilLiteral {
-    self.key = key
-    self._value = Ref(wrappedValue)
-  }
-
-  public init(_ key: String? = nil) {
-    self.key = key
+  public init() {
     self._value = Ref(nil)
   }
 
-  public init(_ key: String? = nil) where T: ExpressibleByNilLiteral {
-    self.key = key
-    let value: T = nil
+  public init() where Value: ExpressibleByNilLiteral {
+    let value: Value = nil
     self._value = Ref(value)
   }
+
+  //
+  //  public init(wrappedValue: T) where T: ExpressibleByNilLiteral {
+  //    self.key = key
+  //    self._value = Ref(wrappedValue)
+  //  }
+
+  //  public init(wrappedValue: T, _ key: String? = nil) {
+  //    self.key = key
+  //    self._value = Ref(wrappedValue)
+  //  }
+  //
+  //  public init(wrappedValue: T, _ key: String? = nil) where T: ExpressibleByNilLiteral {
+  //    self.key = key
+  //    self._value = Ref(wrappedValue)
+  //  }
+
+  //  public init(_ key: String? = nil) {
+  //    self.key = key
+  //    self._value = Ref(nil)
+  //  }
+  //
+  //  public init(_ key: String? = nil) where T: ExpressibleByNilLiteral {
+  //    self.key = key
+  //    let value: T = nil
+  //    self._value = Ref(value)
+  //  }
 }
 
 extension Column {
@@ -119,26 +139,26 @@ extension Column {
       return self.wrappedValue
     }
   }
-  
+
   internal mutating func fetch(propertyName: String, resultSet: FMResultSet) {
     let column = key ?? propertyName
 
     switch self.sqlType {
-    case .bool: wrappedValue = resultSet.bool(forColumn: column) as! T
-    case .string: wrappedValue = resultSet.string(forColumn: column) as! T
-    case .double: wrappedValue = resultSet.double(forColumn: column) as! T
-    case .int: wrappedValue = resultSet.long(forColumn: column) as! T
-    case .int32: wrappedValue = resultSet.int(forColumn: column) as! T
-    case .int64: wrappedValue = resultSet.longLongInt(forColumn: column) as! T
-    case .uint64: wrappedValue = resultSet.unsignedLongLongInt(forColumn: column) as! T
-    case .date: wrappedValue = resultSet.date(forColumn: column) as! T
+    case .bool: wrappedValue = resultSet.bool(forColumn: column) as! Value
+    case .string: wrappedValue = resultSet.string(forColumn: column) as! Value
+    case .double: wrappedValue = resultSet.double(forColumn: column) as! Value
+    case .int: wrappedValue = resultSet.long(forColumn: column) as! Value
+    case .int32: wrappedValue = resultSet.int(forColumn: column) as! Value
+    case .int64: wrappedValue = resultSet.longLongInt(forColumn: column) as! Value
+    case .uint64: wrappedValue = resultSet.unsignedLongLongInt(forColumn: column) as! Value
+    case .date: wrappedValue = resultSet.date(forColumn: column) as! Value
     case .uuid:
       let fetchedUUID = resultSet.string(forColumn: column).flatMap { UUID(uuidString: $0) }
       guard let uuid = fetchedUUID else {
         fatalError("Malformed database: incorrect UUID")
         // TODO: Change to some sort of exception.
       }
-      wrappedValue = uuid as! T
+      wrappedValue = uuid as! Value
     }
   }
 }
