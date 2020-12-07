@@ -25,92 +25,88 @@ internal enum SQLType {
   case uuid(value: UUID?)
 }
 
-internal protocol ColumnProtocol: AnyObject {
-  func fetch(propertyName: String, resultSet: FMResultSet)
-  func typeErasedValue() -> Any
-  var typeName: String { get }
-  var isOptional: Bool { get }
-  var key: String? { get }
-  var objectWillChange: ObservableObjectPublisher? { set get }
+/// The purpose of the Ref type is to give our fetching mechanism a way to set the value of the column
+/// without having access to the original struct (i.e. a copy is obtained via introspection).
+/// This also doubles as copy-on-write for when the struct is copied, although the types allowed may
+/// be too small to matter to be honest.
+internal class Ref<T> {
+  var val: T
+  init(_ v: T) { val = v }
 }
 
-@propertyWrapper public final class Column<T>: ColumnProtocol {
-  private var _value: T?
-  weak var objectWillChange: ObservableObjectPublisher? = nil
+internal protocol ColumnProtocol {
+  mutating func fetch(propertyName: String, resultSet: FMResultSet)
+  func typeErasedValue() -> Any
+  var key: String? { get }
+  func unsafeSetRefValue(to value: Any)
+  var sqlType: SQLType { get }
+}
+
+@propertyWrapper public struct Column<T>: ColumnProtocol {
+  internal var _value: Ref<T?>
   var key: String? = nil
 
-  public var isOptional: Bool
   public var wrappedValue: T {
     get {
-      guard let value = _value else { fatalError("Column is uninitialized before use") }
+      guard let value = _value.val else { fatalError("Column is uninitialized before use") }
       return value
     }
-    set {
-      objectWillChange?.send()
-      _value = newValue
+    set(newValue) {
+      if !isKnownUniquelyReferenced(&_value) {
+        _value = Ref(newValue)
+      } else {
+        _value.val = newValue
+      }
     }
+  }
+  
+  func unsafeSetRefValue(to value: Any) {
+    self._value.val = dynamicCast(value, to: T.self)
   }
 
   var sqlType: SQLType {
     switch T.self {
     case is Bool.Type, is Bool?.Type:
-      return .bool(value: dynamicCast(_value ?? Bool?.none as Any, to: Bool?.self))
+      return .bool(value: dynamicCast(_value.val ?? Bool?.none as Any, to: Bool?.self))
     case is String.Type, is String?.Type:
-      return .string(value: dynamicCast(_value ?? String?.none as Any, to: String?.self))
+      return .string(value: dynamicCast(_value.val ?? String?.none as Any, to: String?.self))
     case is Double.Type, is Double?.Type:
-      return .double(value: dynamicCast(_value ?? Double?.none as Any, to: Double?.self))
+      return .double(value: dynamicCast(_value.val ?? Double?.none as Any, to: Double?.self))
     case is Int.Type, is Int?.Type:
-      return .int(value: dynamicCast(_value ?? Int?.none as Any, to: Int?.self))
+      return .int(value: dynamicCast(_value.val ?? Int?.none as Any, to: Int?.self))
     case is Int32.Type, is Int32?.Type:
-      return .int32(value: dynamicCast(_value ?? Int32?.none as Any, to: Int32?.self))
+      return .int32(value: dynamicCast(_value.val ?? Int32?.none as Any, to: Int32?.self))
     case is Int64.Type, is Int64?.Type:
-      return .int64(value: dynamicCast(_value ?? Int64?.none as Any, to: Int64?.self))
+      return .int64(value: dynamicCast(_value.val ?? Int64?.none as Any, to: Int64?.self))
     case is UInt64.Type, is UInt64?.Type:
-      return .uint64(value: dynamicCast(_value ?? UInt64?.none as Any, to: UInt64?.self))
+      return .uint64(value: dynamicCast(_value.val ?? UInt64?.none as Any, to: UInt64?.self))
     case is Date.Type, is Date?.Type:
-      return .date(value: dynamicCast(_value ?? Date?.none as Any, to: Date?.self))
+      return .date(value: dynamicCast(_value.val ?? Date?.none as Any, to: Date?.self))
     case is UUID.Type, is UUID?.Type:
-      return .uuid(value: dynamicCast(_value ?? UUID?.none as Any, to: UUID?.self))
+      return .uuid(value: dynamicCast(_value.val ?? UUID?.none as Any, to: UUID?.self))
     default: fatalError("Invalid type")
-    }
-  }
-
-  public var typeName: String {
-    switch sqlType {
-    case .int, .int32, .int64, .uint64, .bool, .date:
-      return "INTEGER"
-    case .double:
-      return "REAL"
-    case .string:
-      return "TEXT"
-    case .uuid:
-      return "TEXT"
     }
   }
 
   public init(wrappedValue: T, _ key: String? = nil) {
     self.key = key
-    self._value = wrappedValue
-    isOptional = false
+    self._value = Ref(wrappedValue)
   }
 
   public init(wrappedValue: T, _ key: String? = nil) where T: ExpressibleByNilLiteral {
     self.key = key
-    self._value = wrappedValue
-    isOptional = true
+    self._value = Ref(wrappedValue)
   }
 
   public init(_ key: String? = nil) {
     self.key = key
-    self._value = nil
-    isOptional = false
+    self._value = Ref(nil)
   }
 
   public init(_ key: String? = nil) where T: ExpressibleByNilLiteral {
     self.key = key
     let value: T = nil
-    self._value = value
-    isOptional = true
+    self._value = Ref(value)
   }
 }
 
@@ -123,8 +119,8 @@ extension Column {
       return self.wrappedValue
     }
   }
-
-  internal func fetch(propertyName: String, resultSet: FMResultSet) {
+  
+  internal mutating func fetch(propertyName: String, resultSet: FMResultSet) {
     let column = key ?? propertyName
 
     switch self.sqlType {
