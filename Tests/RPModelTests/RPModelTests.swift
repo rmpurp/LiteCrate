@@ -43,6 +43,14 @@ final class RPModelTests: XCTestCase {
             )
           """, values: nil)
 
+        try db.executeUpdate(
+          """
+            CREATE TABLE UUIDPKPerson (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL
+            )
+          """, values: nil)
+
       }
     }
   }
@@ -57,6 +65,17 @@ final class RPModelTests: XCTestCase {
     bob.delete()
     XCTAssertNil(Person.fetch(with: 1))
     XCTAssertEqual(Person.fetchAll().count, 1)
+  }
+  
+  func testUUIDPrimaryKey() {
+    var person = UUIDPKPerson(name: "Jill")
+    let id = person.id
+    person.save()
+    
+    person = UUIDPKPerson.fetch(with: id)!
+    
+    XCTAssertEqual(person.id, id)
+    XCTAssertEqual(person.name, "Jill")
   }
 
   func createFixtures() {
