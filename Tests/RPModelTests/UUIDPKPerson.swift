@@ -9,7 +9,6 @@ import Foundation
 import RPModel
 
 struct UUIDPKPerson: RPModel {
-
   @Column var id: UUID = UUID()
   @Column var name: String
 

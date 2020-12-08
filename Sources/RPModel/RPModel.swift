@@ -9,7 +9,7 @@ import Combine
 import FMDB
 import Foundation
 
-public protocol RPModel: Identifiable {
+public protocol RPModel: Identifiable, Equatable {
   init()
   override var id: ID { get set }
 }

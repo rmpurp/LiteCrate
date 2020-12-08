@@ -162,3 +162,17 @@ extension Column {
     }
   }
 }
+
+extension Column: Equatable where Value: Equatable {
+  public static func == (lhs: Column<Value>, rhs: Column<Value>) -> Bool {
+    guard lhs._value.val != nil, rhs._value.val != nil else { return true }
+    guard let lhsVal = lhs._value.val, let rhsVal = rhs._value.val else { return false }
+    return lhsVal == rhsVal
+  }
+}
+
+extension Column: Hashable where Value: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_value.val)
+  }
+}
