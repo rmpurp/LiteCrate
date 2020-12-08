@@ -10,7 +10,7 @@ import FMDB
 import Foundation
 import SQLite3
 
-internal class RPModelDatabase {
+public class RPModelDatabase {
   private static var db: FMDatabase!
 
   internal static let tableChangedPublisher = PassthroughSubject<String, Never>()

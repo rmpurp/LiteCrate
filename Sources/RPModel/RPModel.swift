@@ -15,7 +15,7 @@ public protocol RPModel: Identifiable, Equatable {
 }
 
 extension RPModel {
-  fileprivate mutating func populate(resultSet: FMResultSet) {
+  private mutating func populate(resultSet: FMResultSet) {
     for (name, column) in namedColumns {
       let val = extract(propertyName: name, as: column.sqlType, resultSet: resultSet)
       column.unsafeSetRefValue(to: val)
