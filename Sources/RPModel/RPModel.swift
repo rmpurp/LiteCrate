@@ -14,20 +14,20 @@ public protocol RPModel: Identifiable {
   override var id: ID { get set }
 }
 
-internal extension RPModel {
+extension RPModel {
   fileprivate mutating func populate(resultSet: FMResultSet) {
     for (name, column) in namedColumns {
       let val = extract(propertyName: name, as: column.sqlType, resultSet: resultSet)
       column.unsafeSetRefValue(to: val)
     }
   }
-  
+
   private var namedColumns: AnyIterator<(name: String, column: ColumnProtocol)> {
     let mirror = Mirror(reflecting: self)
     let columnIterator = mirror.children.lazy
       .map { child -> (name: String, column: ColumnProtocol)? in
         guard let column = child.value as? ColumnProtocol,
-              let name = child.label?.dropFirst()
+          let name = child.label?.dropFirst()
         else { return nil }
         return (column.key ?? String(name), column)
       }
@@ -49,14 +49,12 @@ internal extension RPModel {
   }
 }
 
+extension RPModel {
+  public static var tableName: String { String(describing: Self.self) }
 
-public extension RPModel {
-  static var tableName: String { String(describing: Self.self) }
-
-  static func fetch(with primaryKey: ID) -> Self? {
+  public static func fetch(with primaryKey: ID) -> Self? {
     return Self.fetchAll(forAllWhere: "id = ?", values: [primaryKey]).first
   }
-
 
   internal static func tableUpdatedPublisher() -> AnyPublisher<Void, Never> {
     RPModelDatabase.tableChangedPublisher
@@ -69,7 +67,7 @@ public extension RPModel {
   /// Creates a publisher that fetches all items that match the where condition given.
   /// - Parameter sqlWhereClause: SQL WHERE clause. If null, fetches all.
   /// - Returns: publisher that publishes the stuff.
-  static func publisher(forAllWhere sqlWhereClause: String? = nil, values: [Any]? = nil)
+  public static func publisher(forAllWhere sqlWhereClause: String? = nil, values: [Any]? = nil)
     -> AnyPublisher<[Self], Never> where Self: RPModel
   {
     Just(())
@@ -79,7 +77,7 @@ public extension RPModel {
       .eraseToAnyPublisher()
   }
 
-  static func publisher(forPrimaryKey primaryKey: ID) -> AnyPublisher<Self?, Never> {
+  public static func publisher(forPrimaryKey primaryKey: ID) -> AnyPublisher<Self?, Never> {
     Just(())
       .append(Self.tableUpdatedPublisher())
       .map { _ in Self.fetch(with: primaryKey) }
@@ -88,7 +86,7 @@ public extension RPModel {
       .eraseToAnyPublisher()
   }
 
-  var updatePublisher: AnyPublisher<Self?, Never> {
+  public var updatePublisher: AnyPublisher<Self?, Never> {
     Self.tableUpdatedPublisher()
       .map { _ in Self.fetch(with: id) }
       .removeDuplicates(by: Self.equalsComparingColumns)
@@ -96,9 +94,8 @@ public extension RPModel {
       .eraseToAnyPublisher()
   }
 
-
   /// Blocking call to fetch
-  static func fetchAll(forAllWhere sqlWhereClause: String? = nil, values: [Any]? = nil)
+  public static func fetchAll(forAllWhere sqlWhereClause: String? = nil, values: [Any]? = nil)
     -> [Self]
   {
     // TODO: Properly rewrite query if where clause is null
@@ -126,12 +123,12 @@ public extension RPModel {
 }
 
 // MARK: - CRUD Operations
-public extension RPModel {
-  func save() where ID == Any? {
+extension RPModel {
+  public func save() where ID == Any? {
     fatalError("Only Int64? is allowed as optional id type")
   }
 
-  mutating func save() where ID == Int64? {
+  public mutating func save() where ID == Int64? {
     let (columnString, placeholders, values) = insertValues
     var insertedID: Int64? = nil
     RPModelDatabase.inDatabase(
@@ -162,7 +159,7 @@ public extension RPModel {
     return (columnString, placeholders, values)
   }
 
-  func save() {
+  public func save() {
     let (columnString, placeholders, values) = insertValues
 
     RPModelDatabase.inDatabase(
@@ -174,7 +171,7 @@ public extension RPModel {
       }, waitUntilComplete: true)
   }
 
-  func delete() {
+  public func delete() {
     RPModelDatabase.inDatabase(
       operation: { [id] db in
         try! db.executeUpdate("DELETE FROM \(Self.tableName) WHERE id = ?", values: [id])
@@ -184,8 +181,8 @@ public extension RPModel {
 }
 
 // MARK: - Int64? PK Special Handling
-public extension RPModel where ID == Int64? {
-  var updatePublisher: AnyPublisher<Self?, Never> {
+extension RPModel where ID == Int64? {
+  public var updatePublisher: AnyPublisher<Self?, Never> {
     guard id != nil else {
       fatalError("id must not be nil to use this publisher; you need to save first")
     }
@@ -195,7 +192,7 @@ public extension RPModel where ID == Int64? {
 
 private func extract(propertyName: String, as sqlType: SQLType, resultSet: FMResultSet) -> Any {
   let column = propertyName
-  
+
   switch sqlType {
   case .bool: return resultSet.bool(forColumn: column)
   case .string: return resultSet.string(forColumn: column) as Any
@@ -216,4 +213,3 @@ private func extract(propertyName: String, as sqlType: SQLType, resultSet: FMRes
     return uuid
   }
 }
-
