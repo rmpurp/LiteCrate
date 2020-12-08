@@ -12,8 +12,8 @@ final class RPModelTests: XCTestCase {
   private let date1 = Date(timeIntervalSince1970: 123_456_789)
 
   override func setUp() {
-    RPModel.closeDatabase()
-    RPModel.openDatabase(at: nil) { (db, currentVersion) in
+    RPModelDatabase.closeDatabase()
+    RPModelDatabase.openDatabase(at: nil) { (db, currentVersion) in
       if currentVersion < 0 {
         try db.executeUpdate(
           """
@@ -33,12 +33,21 @@ final class RPModelTests: XCTestCase {
                 FOREIGN KEY (owner) REFERENCES Person(id)
             )
           """, values: nil)
-        
+
         try db.executeUpdate(
           """
             CREATE TABLE UUIDPerson (
                 id INTEGER PRIMARY KEY,
-                specialID TEXT NOT NULL
+                specialID TEXT NOT NULL,
+                optionalID TEXT
+            )
+          """, values: nil)
+
+        try db.executeUpdate(
+          """
+            CREATE TABLE UUIDPKPerson (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL
             )
           """, values: nil)
 
@@ -47,40 +56,102 @@ final class RPModelTests: XCTestCase {
   }
 
   override func tearDown() {
-    RPModel.closeDatabase()
+    RPModelDatabase.closeDatabase()
   }
 
   func testDelete() {
     createFixtures()
     let bob = Person.fetch(with: 1)!
-    XCTAssertFalse(bob.isDeleted)
-    bob.delete(waitUntilComplete: true)
-    XCTAssertTrue(bob.isDeleted)
+    bob.delete()
     XCTAssertNil(Person.fetch(with: 1))
     XCTAssertEqual(Person.fetchAll().count, 1)
   }
 
-  func testCreateTableStatement() {
-    let acceptableOutputs = [
-      "CREATE TABLE Person ( id INTEGER PRIMARY KEY , name TEXT NOT NULL , birthday INTEGER  )",
-      "CREATE TABLE Person ( id INTEGER PRIMARY KEY , birthday INTEGER  , name TEXT NOT NULL )",
-    ]
-    XCTAssertTrue(
-      acceptableOutputs.contains(Person.createTableStatement), Person.createTableStatement)
+  func testUUIDPrimaryKey() {
+    var person = UUIDPKPerson(name: "Jill")
+    let id = person.id
+    person.save()
+
+    person = UUIDPKPerson.fetch(with: id)!
+
+    XCTAssertEqual(person.id, id)
+    XCTAssertEqual(person.name, "Jill")
   }
 
   func createFixtures() {
-    let bob = Person()
+    var bob = Person()
     bob.name = "Bob"
     bob.birthday = date1
-    bob.save(waitUntilComplete: true)
-    let carol = Person()
+    bob.save()
+    var carol = Person()
     carol.name = "Carol"
-    carol.save(waitUntilComplete: true)
+    carol.save()
+  }
+
+  func testPrimaryKeyPublisher() {
+    var alice = Person()
+    alice.name = "Alice"
+    alice.birthday = date1
+    alice.save()
+
+    var receivedPerson: Person? = nil
+    let semaphore = DispatchSemaphore(value: 0)
+
+    _ = Person.publisher(forPrimaryKey: alice.id)
+      .sink {
+        receivedPerson = $0
+        semaphore.signal()
+      }
+    XCTAssertEqual(semaphore.waitABit(), .success)
+    XCTAssertEqual(receivedPerson?.id, alice.id)
+    XCTAssertEqual(receivedPerson?.name, "Alice")
+    XCTAssertEqual(receivedPerson?.birthday, date1)
+
+    var bob = Person()
+    bob.name = "Bob"
+    bob.save()
+
+    alice.name = "Alice Changed"
+    alice.save()
+    XCTAssertEqual(semaphore.waitABit(), .success)
+    XCTAssertEqual(receivedPerson?.id, alice.id)
+    XCTAssertEqual(receivedPerson?.name, "Alice Changed")
+    XCTAssertEqual(receivedPerson?.birthday, alice.birthday)
+
+  }
+
+  func testUpdatePublisher() {
+    var alice = Person()
+    alice.name = "Alice"
+    alice.birthday = date1
+    alice.save()
+
+    XCTAssertNotNil(alice.id)
+
+    let semaphore = DispatchSemaphore(value: 0)
+
+    var aliceChanged: Person? = nil
+
+    _ = alice.updatePublisher.sink {
+      aliceChanged = $0
+      semaphore.signal()
+    }
+
+    alice.name = "Alice Changed"
+    alice.save()
+    XCTAssertEqual(semaphore.waitABit(), .success)
+
+    if let aliceChanged = aliceChanged {
+      XCTAssertEqual(aliceChanged.name, "Alice Changed")
+      XCTAssertEqual(aliceChanged.id, alice.id)
+      XCTAssertEqual(aliceChanged.birthday, alice.birthday)
+    } else {
+      XCTFail()
+    }
   }
 
   func testTableUpdatedPublisher() {
-    let alice: Person = Person()
+    var alice = Person()
     alice.name = "Alice"
     let semaphore = DispatchSemaphore(value: 0)
     var personDidFire = false
@@ -91,15 +162,13 @@ final class RPModelTests: XCTestCase {
         semaphore.signal()
       }
 
-    alice.save(waitUntilComplete: true)
-    semaphore.wait()
-    //    XCTAssertEqual(semaphore.waitABit(), .success)
+    alice.save()
+    XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertTrue(personDidFire)
 
     personDidFire = false
-    alice.save(waitUntilComplete: true)
-    semaphore.wait()
-    //    XCTAssertEqual(semaphore.waitABit(), .success)
+    alice.save()
+    XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertTrue(personDidFire)
 
     // Try inserting another object, make sure person publisher does not fire
@@ -112,7 +181,7 @@ final class RPModelTests: XCTestCase {
         dogDidFire = true
         semaphore.signal()
       }
-    fido.save(waitUntilComplete: true)
+    fido.save()
     XCTAssertEqual(semaphore.waitABit(), .success)
 
     XCTAssertFalse(personDidFire)
@@ -138,12 +207,11 @@ final class RPModelTests: XCTestCase {
 
     XCTAssertEqual(fetchedPeople.count, 2)
     for person in fetchedPeople {
-      XCTAssertTrue(expectedIDs.contains(person.id))
+      XCTAssertTrue(expectedIDs.contains(person.id!))
     }
-
-    let alice = Person()
+    var alice = Person()
     alice.name = "Alice"
-    alice.save(waitUntilComplete: true)
+    alice.save()
     expectedIDs.insert(3)
 
     if semaphore.waitABit() == .timedOut {
@@ -152,41 +220,35 @@ final class RPModelTests: XCTestCase {
 
     XCTAssertEqual(fetchedPeople.count, 3)
     for person in fetchedPeople {
-      XCTAssertTrue(expectedIDs.contains(person.id))
+      XCTAssertTrue(expectedIDs.contains(person.id!))
     }
   }
-  
+
   func testFetchUUID() {
-    var person: UUIDPerson? = UUIDPerson()
+    var person: UUIDPerson = UUIDPerson()
     let uuid = UUID()
-    person!.specialID = uuid
-    person!.save(waitUntilComplete: true)
-    let id = person?.id
-    person = nil // Deallocate
-    
-    let refetchedPerson = UUIDPerson.fetch(with: id!)!
-    XCTAssertEqual(refetchedPerson.specialID, uuid)
-  }
+    person.specialID = uuid
+    person.save()
 
-  func testConsistentFetchAfterSave() {
-    let alice: Person! = Person()
-    alice.name = "Alice"
-    alice.save(waitUntilComplete: true)
-    XCTAssertEqual(alice.id, 1)
-    XCTAssertEqual(alice.name, "Alice")
-    XCTAssertEqual(alice.birthday, nil)
+    let id = person.id
 
-    let alice2 = Person.fetch(with: 1)!
-    XCTAssertEqual(alice2.id, 1)
-    XCTAssertEqual(alice2.name, "Alice")
-    XCTAssertEqual(alice2.birthday, nil)
-    XCTAssertTrue(alice === alice2)
+    person = UUIDPerson.fetch(with: id!)!
+    XCTAssertEqual(person.specialID, uuid)
+    XCTAssertEqual(person.optionalID, nil)
+
+    let optionalID = UUID()
+    person.optionalID = optionalID
+    person.save()
+
+    person = UUIDPerson.fetch(with: id!)!
+    XCTAssertEqual(person.specialID, uuid)
+    XCTAssertEqual(person.optionalID, optionalID)
   }
 
   func testSave() {
     var alice: Person! = Person()
     alice.name = "Alice"
-    alice.save(waitUntilComplete: true)
+    alice.save()
     XCTAssertEqual(alice.id, 1)
     XCTAssertEqual(alice.name, "Alice")
     XCTAssertEqual(alice.birthday, nil)
@@ -196,9 +258,6 @@ final class RPModelTests: XCTestCase {
     XCTAssertEqual(alice2.id, 1)
     XCTAssertEqual(alice2.name, "Alice")
     XCTAssertEqual(alice2.birthday, nil)
-
-    let alice3 = Person.fetch(with: 1)!
-    XCTAssertTrue(alice2 === alice3)
   }
 
   func testFetch() {
