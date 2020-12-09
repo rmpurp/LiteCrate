@@ -35,18 +35,6 @@ extension RPModel {
       .makeIterator()
     return AnyIterator(columnIterator)
   }
-
-  private static func equalsComparingColumns(lhs: Self?, rhs: Self?) -> Bool {
-    guard lhs != nil, rhs != nil else { return true }  // If both nil, they are the same, technically
-    guard let lhs = lhs, let rhs = rhs else { return false }  // Guards that both are some. Else exactly one is nil.
-    let rhsNamedColumns = Dictionary(
-      uniqueKeysWithValues: rhs.namedColumns.map { ($0.name, $0.column) })
-    for (name, lhsColumn) in lhs.namedColumns {
-      guard let rhsColumn = rhsNamedColumns[name] else { return false }
-      if lhsColumn.sqlType != rhsColumn.sqlType { return false }
-    }
-    return true
-  }
 }
 
 extension RPModel {
@@ -81,7 +69,7 @@ extension RPModel {
     Just(())
       .append(Self.tableUpdatedPublisher())
       .map { _ in Self.fetch(with: primaryKey) }
-      .removeDuplicates(by: Self.equalsComparingColumns)
+      .removeDuplicates()
       .subscribe(on: RPModelDatabase.queue)
       .eraseToAnyPublisher()
   }
@@ -89,7 +77,7 @@ extension RPModel {
   public var updatePublisher: AnyPublisher<Self?, Never> {
     Self.tableUpdatedPublisher()
       .map { _ in Self.fetch(with: id) }
-      .removeDuplicates(by: Self.equalsComparingColumns)
+      .removeDuplicates()
       .subscribe(on: RPModelDatabase.queue)
       .eraseToAnyPublisher()
   }
