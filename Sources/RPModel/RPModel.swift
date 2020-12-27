@@ -158,13 +158,16 @@ extension RPModel {
 
       }, waitUntilComplete: true)
   }
-
-  public func delete() {
+  
+  public static func delete(with id: Self.ID) {
     RPModelDatabase.inDatabase(
       operation: { [id] db in
         try! db.executeUpdate("DELETE FROM \(Self.tableName) WHERE id = ?", values: [id])
-
       }, waitUntilComplete: true)
+  }
+
+  public func delete() {
+    Self.delete(with: id)
   }
 }
 
