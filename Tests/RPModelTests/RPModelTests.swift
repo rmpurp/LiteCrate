@@ -12,8 +12,8 @@ final class RPModelTests: XCTestCase {
   private let date1 = Date(timeIntervalSince1970: 123_456_789)
 
   override func setUp() {
-    RPModelDatabase.closeDatabase()
-    RPModelDatabase.openDatabase(at: nil) { (db, currentVersion) in
+    DataStore.closeDatabase()
+    DataStore.openDatabase(at: nil) { (db, currentVersion) in
       if currentVersion < 0 {
         try db.executeUpdate(
           """
@@ -56,7 +56,7 @@ final class RPModelTests: XCTestCase {
   }
 
   override func tearDown() {
-    RPModelDatabase.closeDatabase()
+    DataStore.closeDatabase()
   }
 
   func testDelete() {

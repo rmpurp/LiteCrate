@@ -45,7 +45,7 @@ extension RPModel {
   }
 
   internal static func tableUpdatedPublisher() -> AnyPublisher<Void, Never> {
-    RPModelDatabase.tableChangedPublisher
+    DataStore.tableChangedPublisher
       .filter { $0 == Self.tableName }
       .map { _ in () }
       .assertNoFailure()
@@ -61,7 +61,7 @@ extension RPModel {
     Just(())
       .append(Self.tableUpdatedPublisher())
       .map { _ in Self.fetchAll(forAllWhere: sqlWhereClause, values: values) }
-      .subscribe(on: RPModelDatabase.queue)
+      .subscribe(on: DataStore.queue)
       .eraseToAnyPublisher()
   }
 
@@ -70,7 +70,7 @@ extension RPModel {
       .append(Self.tableUpdatedPublisher())
       .map { _ in Self.fetch(with: primaryKey) }
       .removeDuplicates()
-      .subscribe(on: RPModelDatabase.queue)
+      .subscribe(on: DataStore.queue)
       .eraseToAnyPublisher()
   }
 
@@ -78,7 +78,7 @@ extension RPModel {
     Self.tableUpdatedPublisher()
       .map { _ in Self.fetch(with: id) }
       .removeDuplicates()
-      .subscribe(on: RPModelDatabase.queue)
+      .subscribe(on: DataStore.queue)
       .eraseToAnyPublisher()
   }
 
@@ -90,7 +90,7 @@ extension RPModel {
     let sqlWhereClause = sqlWhereClause ?? "1=1"
     var returnValue = [Self]()
 
-    RPModelDatabase.inDatabase(
+    DataStore.inDatabase(
       operation: { db in
         guard
           let rs = try? db.executeQuery(
@@ -119,7 +119,7 @@ extension RPModel {
   public mutating func save() where ID == Int64? {
     let (columnString, placeholders, values) = insertValues
     var insertedID: Int64? = nil
-    RPModelDatabase.inDatabase(
+    DataStore.inDatabase(
       operation: { [id] (db) in
         try! db.executeUpdate(
           "INSERT OR REPLACE INTO \(Self.tableName)(\(columnString)) VALUES (\(placeholders)) ",
@@ -134,6 +134,19 @@ extension RPModel {
     }
   }
 
+  public func save() {
+    let (columnString, placeholders, values) = insertValues
+
+    DataStore.inDatabase(
+      operation: { (db) in
+        try! db.executeUpdate(
+          "INSERT OR REPLACE INTO \(Self.tableName)(\(columnString)) VALUES (\(placeholders)) ",
+          values: values)
+
+      }, waitUntilComplete: true)
+  }
+  
+
   private var insertValues: (columnString: String, placeholders: String, values: [Any]) {
     var columnsToValue = [String: Any]()
     for (name, column) in namedColumns {
@@ -147,20 +160,8 @@ extension RPModel {
     return (columnString, placeholders, values)
   }
 
-  public func save() {
-    let (columnString, placeholders, values) = insertValues
-
-    RPModelDatabase.inDatabase(
-      operation: { (db) in
-        try! db.executeUpdate(
-          "INSERT OR REPLACE INTO \(Self.tableName)(\(columnString)) VALUES (\(placeholders)) ",
-          values: values)
-
-      }, waitUntilComplete: true)
-  }
-  
   public static func delete(with id: Self.ID) {
-    RPModelDatabase.inDatabase(
+    DataStore.inDatabase(
       operation: { [id] db in
         try! db.executeUpdate("DELETE FROM \(Self.tableName) WHERE id = ?", values: [id])
       }, waitUntilComplete: true)
