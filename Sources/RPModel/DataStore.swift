@@ -11,10 +11,10 @@ import Foundation
 import SQLite3
 
 public class DataStore {
-  private var db: FMDatabase!
-  
+  var db: FMDatabase!
 
   internal let tableChangedPublisher = PassthroughSubject<String, Never>()
+  
   internal let queue: DispatchQueue = DispatchQueue(
     label: "RPModelDispatchQueue",
     qos: .userInteractive,
@@ -22,11 +22,17 @@ public class DataStore {
     autoreleaseFrequency: .workItem,
     target: nil)
 
-  public init(url: URL?, migration: (FMDatabase, inout Int64) throws -> Void) {
+  let testQueueKey = DispatchSpecificKey<Void>()
+  
+  var isOnQueue: Bool { DispatchQueue.getSpecific(key: testQueueKey) != nil }
+  var tablesToSignal = Set<String>()
+  
+  public init(url: URL?, migration: (FMDatabase, inout Int64) throws -> Void) rethrows {
+    queue.setSpecific(key: testQueueKey, value: ())
 
     db = FMDatabase(url: url)
     db.open()
-
+    
     let raw = Unmanaged.passUnretained(self).toOpaque()
 
     sqlite3_update_hook(
@@ -37,12 +43,10 @@ public class DataStore {
         let dataStore = Unmanaged<DataStore>.fromOpaque(aux).takeUnretainedValue()
 
         let tableName = String(cString: cTableName)
-        dataStore.queue.async {
-          dataStore.tableChangedPublisher.send(tableName)
-        }
+        dataStore.tablesToSignal.insert(tableName)
       }, raw)
 
-    inTransactionSync { db in
+    try transact { db in
         var currentVersion = try getCurrentSchemaVersion()
         try migration(db, &currentVersion)
         try setCurrentSchemaVersion(version: currentVersion)
@@ -56,30 +60,30 @@ public class DataStore {
     db = nil
   }
   
-  private var isInTransaction = false
-  
-  internal func inTransactionSync(operation: (FMDatabase) throws -> Void) {
-    queue.sync {
-      isInTransaction = true
-      defer { isInTransaction = false }
-      do {
-      try operation(db)
-      } catch {
-        db.rollback()
-      }
-    }
-  }
-
-  internal func inTransaction(operation: @escaping (FMDatabase) throws -> Void) {
-    queue.async { [db] in
-      guard let db = db else { return }
+  public func inTransaction(operation: (FMDatabase) throws -> Void) rethrows {
+    do {
       db.beginTransaction()
-      do {
       try operation(db)
-        db.commit()
-      } catch {
-        db.rollback()
+      db.commit()
+      // Copy so they don't get wiped out by race condition
+      let tablesToSignal = self.tablesToSignal
+      queue.async { [weak self] in
+        guard let self = self else { return }
+        tablesToSignal.forEach {
+          self.tableChangedPublisher.send($0)
+        }
       }
+    } catch {
+      db.rollback()
+    }
+    tablesToSignal = []
+  }
+    
+  public func transact(operation: (FMDatabase) throws -> Void) rethrows {
+    if isOnQueue {
+      try inTransaction(operation: operation)
+    } else {
+      try queue.sync { try inTransaction(operation: operation) }
     }
   }
 

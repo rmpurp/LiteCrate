@@ -15,14 +15,14 @@ public protocol RPModel: Identifiable, Equatable {
 }
 
 extension RPModel {
-  private mutating func populate(resultSet: FMResultSet) {
+  internal mutating func populate(resultSet: FMResultSet) {
     for (name, column) in namedColumns {
       let val = extract(propertyName: name, as: column.sqlType, resultSet: resultSet)
       column.unsafeSetRefValue(to: val)
     }
   }
 
-  private var namedColumns: AnyIterator<(name: String, column: ColumnProtocol)> {
+  internal var namedColumns: AnyIterator<(name: String, column: ColumnProtocol)> {
     let mirror = Mirror(reflecting: self)
     let columnIterator = mirror.children.lazy
       .map { child -> (name: String, column: ColumnProtocol)? in
@@ -35,119 +35,8 @@ extension RPModel {
       .makeIterator()
     return AnyIterator(columnIterator)
   }
-}
-
-extension RPModel {
-  public static var tableName: String { String(describing: Self.self) }
-
-  public static func fetch(with primaryKey: ID) -> Self? {
-    return Self.fetchAll(forAllWhere: "id = ?", values: [primaryKey]).first
-  }
-
-  internal static func tableUpdatedPublisher() -> AnyPublisher<Void, Never> {
-    DataStore.tableChangedPublisher
-      .filter { $0 == Self.tableName }
-      .map { _ in () }
-      .assertNoFailure()
-      .eraseToAnyPublisher()
-  }
-
-  /// Creates a publisher that fetches all items that match the where condition given.
-  /// - Parameter sqlWhereClause: SQL WHERE clause. If null, fetches all.
-  /// - Returns: publisher that publishes the stuff.
-  public static func publisher(forAllWhere sqlWhereClause: String? = nil, values: [Any]? = nil)
-    -> AnyPublisher<[Self], Never> where Self: RPModel
-  {
-    Just(())
-      .append(Self.tableUpdatedPublisher())
-      .map { _ in Self.fetchAll(forAllWhere: sqlWhereClause, values: values) }
-      .subscribe(on: DataStore.queue)
-      .eraseToAnyPublisher()
-  }
-
-  public static func publisher(forPrimaryKey primaryKey: ID) -> AnyPublisher<Self?, Never> {
-    Just(())
-      .append(Self.tableUpdatedPublisher())
-      .map { _ in Self.fetch(with: primaryKey) }
-      .removeDuplicates()
-      .subscribe(on: DataStore.queue)
-      .eraseToAnyPublisher()
-  }
-
-  public var updatePublisher: AnyPublisher<Self?, Never> {
-    Self.tableUpdatedPublisher()
-      .map { _ in Self.fetch(with: id) }
-      .removeDuplicates()
-      .subscribe(on: DataStore.queue)
-      .eraseToAnyPublisher()
-  }
-
-  /// Blocking call to fetch
-  public static func fetchAll(forAllWhere sqlWhereClause: String? = nil, values: [Any]? = nil)
-    -> [Self]
-  {
-    // TODO: Properly rewrite query if where clause is null
-    let sqlWhereClause = sqlWhereClause ?? "1=1"
-    var returnValue = [Self]()
-
-    DataStore.inDatabase(
-      operation: { db in
-        guard
-          let rs = try? db.executeQuery(
-            "SELECT * FROM \(Self.tableName) WHERE \(sqlWhereClause)",
-            values: values)
-        else {
-          return
-        }
-
-        while rs.next() {
-          var model = Self()
-          model.populate(resultSet: rs)
-          returnValue.append(model)
-        }
-      }, waitUntilComplete: true)
-    return returnValue
-  }
-}
-
-// MARK: - CRUD Operations
-extension RPModel {
-  public func save() where ID == Any? {
-    fatalError("Only Int64? is allowed as optional id type")
-  }
-
-  public mutating func save() where ID == Int64? {
-    let (columnString, placeholders, values) = insertValues
-    var insertedID: Int64? = nil
-    DataStore.inDatabase(
-      operation: { [id] (db) in
-        try! db.executeUpdate(
-          "INSERT OR REPLACE INTO \(Self.tableName)(\(columnString)) VALUES (\(placeholders)) ",
-          values: values)
-        if id == nil {
-          insertedID = db.lastInsertRowId
-        }
-      }, waitUntilComplete: true)
-
-    if let insertedID = insertedID {
-      self.id = insertedID
-    }
-  }
-
-  public func save() {
-    let (columnString, placeholders, values) = insertValues
-
-    DataStore.inDatabase(
-      operation: { (db) in
-        try! db.executeUpdate(
-          "INSERT OR REPLACE INTO \(Self.tableName)(\(columnString)) VALUES (\(placeholders)) ",
-          values: values)
-
-      }, waitUntilComplete: true)
-  }
   
-
-  private var insertValues: (columnString: String, placeholders: String, values: [Any]) {
+  internal var insertValues: (columnString: String, placeholders: String, values: [Any]) {
     var columnsToValue = [String: Any]()
     for (name, column) in namedColumns {
       columnsToValue[name] = column.typeErasedValue()
@@ -159,26 +48,129 @@ extension RPModel {
     let values = columns.map { columnsToValue[$0]! }
     return (columnString, placeholders, values)
   }
+}
 
-  public static func delete(with id: Self.ID) {
-    DataStore.inDatabase(
-      operation: { [id] db in
-        try! db.executeUpdate("DELETE FROM \(Self.tableName) WHERE id = ?", values: [id])
-      }, waitUntilComplete: true)
+extension RPModel {
+  public static var tableName: String { String(describing: Self.self) }
+
+  public static func fetch(store: DataStore, with primaryKey: ID) -> Self? {
+    return Self.fetchAll(store: store, forAllWhere: "id = ?", values: [primaryKey]).first
   }
 
-  public func delete() {
-    Self.delete(with: id)
+  internal static func tableUpdatedPublisher(store: DataStore) -> AnyPublisher<Void, Never> {
+    store.tableChangedPublisher
+      .filter { $0 == Self.tableName }
+      .map { _ in () }
+      .assertNoFailure()
+      .eraseToAnyPublisher()
+  }
+
+  /// Creates a publisher that fetches all items that match the where condition given.
+  /// - Parameter sqlWhereClause: SQL WHERE clause. If null, fetches all.
+  /// - Returns: publisher that publishes the stuff.
+  public static func publisher(store: DataStore, forAllWhere sqlWhereClause: String? = nil, values: [Any]? = nil)
+    -> AnyPublisher<[Self], Never> where Self: RPModel
+  {
+    Just(())
+      .subscribe(on: store.queue)
+      .append(Self.tableUpdatedPublisher(store: store))
+      .map { _ in Self.fetchAll(store: store, forAllWhere: sqlWhereClause, values: values) }
+      .eraseToAnyPublisher()
+  }
+
+  public static func publisher(store: DataStore, forPrimaryKey primaryKey: ID) -> AnyPublisher<Self?, Never> {
+    Just(())
+      .subscribe(on: store.queue)
+      .append(Self.tableUpdatedPublisher(store: store))
+      .map {
+        _ in Self.fetch(store: store, with: primaryKey)
+      }
+      .removeDuplicates()
+      .eraseToAnyPublisher()
+  }
+
+  public func updatePublisher(store: DataStore) -> AnyPublisher<Self?, Never> {
+    Self.tableUpdatedPublisher(store: store)
+      .map { _ in Self.fetch(store: store, with: id) }
+      .removeDuplicates()
+      .eraseToAnyPublisher()
+  }
+
+  /// Blocking call to fetch
+  public static func fetchAll(store: DataStore, forAllWhere sqlWhereClause: String? = nil, values: [Any]? = nil)
+    -> [Self]
+  {
+    // TODO: Properly rewrite query if where clause is null
+    let sqlWhereClause = sqlWhereClause ?? "1=1"
+    var returnValue = [Self]()
+
+    store.transact { db in
+        guard
+          let rs = try? db.executeQuery(
+            "SELECT * FROM \(Self.tableName) WHERE \(sqlWhereClause)",
+            values: values)
+        else { return }
+
+        while rs.next() {
+          var model = Self()
+          model.populate(resultSet: rs)
+          returnValue.append(model)
+        }
+      }
+    
+    return returnValue
   }
 }
 
+// MARK: - CRUD
+extension RPModel {
+  public func save(store: DataStore) -> Never where ID == Any? {
+    fatalError("Only Int64? is allowed as optional id type")
+  }
+  
+  mutating public func save(store: DataStore) throws where ID == Int64? {
+    try store.transact { db in
+      let (columnString, placeholders, values) = insertValues
+      
+      try store.db.executeUpdate(
+        "INSERT OR REPLACE INTO \(Self.tableName)(\(columnString)) VALUES (\(placeholders)) ",
+        values: values)
+      id = db.lastInsertRowId
+    }
+  }
+  
+  public func save(store: DataStore) throws {
+    try store.transact { db in
+      let (columnString, placeholders, values) = insertValues
+      
+      try db.executeUpdate(
+        "INSERT OR REPLACE INTO \(Self.tableName)(\(columnString)) VALUES (\(placeholders)) ",
+        values: values)
+    }
+  }
+  
+
+  public static func delete(store: DataStore, with id: ID) throws {
+    try store.transact { db in
+      try db.executeUpdate("DELETE FROM \(Self.tableName) WHERE id = ?", values: [id])
+    }
+  }
+
+  public func delete(store: DataStore) throws {
+    try store.transact { db in
+      try store.db.executeUpdate("DELETE FROM \(Self.tableName) WHERE id = ?", values: [id])
+    }
+  }
+}
+
+
 // MARK: - Int64? PK Special Handling
 extension RPModel where ID == Int64? {
-  public var updatePublisher: AnyPublisher<Self?, Never> {
+  public func updatePublisher(store: DataStore) -> AnyPublisher<Self?, Never> {
     guard id != nil else {
       fatalError("id must not be nil to use this publisher; you need to save first")
     }
-    return Self.publisher(forPrimaryKey: self.id)
+    return Self.publisher(store: store, forPrimaryKey: self.id)
   }
 }
 
