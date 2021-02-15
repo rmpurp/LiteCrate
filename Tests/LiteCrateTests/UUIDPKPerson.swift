@@ -6,13 +6,11 @@
 //
 
 import Foundation
-import RPModel
+import LiteCrate
 
-struct UUIDPKPerson: RPModel {
-  @Column var id: UUID = UUID()
-  @Column var name: String
-
-  init() {}
+struct UUIDPKPerson: LCModel {
+  var id: UUID = UUID()
+  var name: String
 
   init(name: String) {
     self.name = name

@@ -1,6 +1,7 @@
 import XCTest
+import Combine
 
-@testable import RPModel
+@testable import LiteCrate
 
 extension DispatchSemaphore {
   func waitABit() -> DispatchTimeoutResult {
@@ -8,14 +9,17 @@ extension DispatchSemaphore {
   }
 }
 
-final class RPModelTests: XCTestCase {
+final class LiteCrateTests: XCTestCase {
   private let date1 = Date(timeIntervalSince1970: 123_456_789)
   
-  var store: DataStore! = nil
-  
+  var crate: LiteCrate! = nil
+
+  let updateQueue = DispatchQueue(label: "UpdateQueue")
+
   override func setUp() {
-    store = try! DataStore(url: nil) { (db, currentVersion) in
-      if currentVersion < 0 {
+    crate = try! LiteCrate(url: nil, updateQueue: updateQueue) { (db, currentVersion) in
+      NSLog("VERSION: %@", currentVersion)
+      if currentVersion < 1 {
         try db.executeUpdate(
           """
             CREATE TABLE Person (
@@ -57,90 +61,92 @@ final class RPModelTests: XCTestCase {
   }
 
   override func tearDown() {
-    store.closeDatabase()
-    store = nil
+    updateQueue.sync { print("Clearing out update queue...") }
+    crate.closeDatabase()
+    crate = nil
   }
 
   func testDelete() {
     createFixtures()
-    let bob = Person.fetch(store: store, with: 1)!
-    try! bob.delete(store: store)
-    XCTAssertNil(Person.fetch(store: store, with: 1))
-    XCTAssertEqual(Person.fetchAll(store: store).count, 1)
+    let bob = try! Person.fetch(from: crate, with: 1)!
+    try! bob.delete(from: crate)
+    try! XCTAssertNil(Person.fetch(from: crate, with: 1))
+    try! XCTAssertEqual(Person.fetchAll(from: crate).count, 1)
   }
 
   func testUUIDPrimaryKey() {
     var person = UUIDPKPerson(name: "Jill")
     let id = person.id
-    try! person.save(store: store)
+    try! person.save(in: crate)
 
-    person = UUIDPKPerson.fetch(store: store,with: id)!
+    person = try!  UUIDPKPerson.fetch(from: crate,with: id)!
 
     XCTAssertEqual(person.id, id)
     XCTAssertEqual(person.name, "Jill")
   }
 
   func createFixtures() {
-    var bob = Person()
-    bob.name = "Bob"
-    bob.birthday = date1
-    try! bob.save(store: store)
-    var carol = Person()
+    var bob = Person(name: "Bob", birthday: date1)
+    try! bob.save(in: crate)
+    var carol = Person(name: "Carol", birthday: nil)
     carol.name = "Carol"
-    try! carol.save(store: store)
+    try! carol.save(in: crate)
   }
 
   func testPrimaryKeyPublisher() {
-    var alice = Person()
-    alice.name = "Alice"
-    alice.birthday = date1
-    try! alice.save(store: store)
+    var alice = Person(name: "Alice", birthday: date1)
+    try! alice.save(in: crate)
 
     var receivedPerson: Person? = nil
     let semaphore = DispatchSemaphore(value: 0)
-
-    _ = Person.publisher(store: store, forPrimaryKey: alice.id)
+    
+    let testQueue = DispatchQueue(label: "testPrimaryKeyPublisher")
+    var subscriptions = Set<AnyCancellable>()
+    Person.publisher(in: crate, forPrimaryKey: alice.id)
+      .receive(on: testQueue)
       .sink {
         receivedPerson = $0
         semaphore.signal()
       }
+      .store(in: &subscriptions)
     XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertEqual(receivedPerson?.id, alice.id)
     XCTAssertEqual(receivedPerson?.name, "Alice")
     XCTAssertEqual(receivedPerson?.birthday, date1)
 
-    var bob = Person()
-    bob.name = "Bob"
-    try! bob.save(store: store)
+    var bob = Person(name: "Bob", birthday: nil)
+    try! bob.save(in: crate)
 
     alice.name = "Alice Changed"
-    try! alice.save(store: store)
+    try! alice.save(in: crate)
     XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertEqual(receivedPerson?.id, alice.id)
     XCTAssertEqual(receivedPerson?.name, "Alice Changed")
     XCTAssertEqual(receivedPerson?.birthday, alice.birthday)
-
+    subscriptions.removeAll()
   }
 
   func testUpdatePublisher() {
-    var alice = Person()
-    alice.name = "Alice"
-    alice.birthday = date1
-    try! alice.save(store: store)
+    var alice = Person(name: "Alice", birthday: date1)
+    try! alice.save(in: crate)
 
     XCTAssertNotNil(alice.id)
-
+    let testQueue = DispatchQueue(label: "testUpdatePublisher")
     let semaphore = DispatchSemaphore(value: 0)
 
     var aliceChanged: Person? = nil
+    var subscriptions = Set<AnyCancellable>()
+    defer { subscriptions.removeAll() }
 
-    _ = alice.updatePublisher(store: store).sink {
+    alice.updatePublisher(in: crate)
+      .receive(on: testQueue)
+      .sink {
       aliceChanged = $0
       semaphore.signal()
-    }
+    }.store(in: &subscriptions)
 
     alice.name = "Alice Changed"
-    try! alice.save(store: store)
+    try! alice.save(in: crate)
     XCTAssertEqual(semaphore.waitABit(), .success)
 
     if let aliceChanged = aliceChanged {
@@ -151,46 +157,48 @@ final class RPModelTests: XCTestCase {
       XCTFail()
     }
   }
-
+  
   func testTableUpdatedPublisher() {
-    var alice = Person()
-    alice.name = "Alice"
+    var alice = Person(name: "Alice")
     let semaphore = DispatchSemaphore(value: 0)
     var personDidFire = false
-
-    let subscription = Person.tableUpdatedPublisher(store: store)
+    
+    let testQueue = DispatchQueue(label: "testTableUpdatedPublisherQueue")
+    
+    var subscriptions = Set<AnyCancellable>()
+    defer { subscriptions.removeAll() } // Ensure subscriptions stays in scope
+    Person.tableUpdatedPublisher(in: crate)
+      .receive(on: testQueue)
       .sink {
         personDidFire = true
         semaphore.signal()
-      }
-
-    try! alice.save(store: store)
+      }.store(in: &subscriptions)
+    
+    try! alice.save(in: crate)
     XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertTrue(personDidFire)
-
+    
     personDidFire = false
-    try! alice.save(store: store)
+    try! alice.save(in: crate)
     XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertTrue(personDidFire)
-
+    
     // Try inserting another object, make sure person publisher does not fire
     var dogDidFire = false
     personDidFire = false
-
+    
     let fido = Dog(name: "Fido", owner: 3)
-    let dogSub = Dog.tableUpdatedPublisher(store: store)
+    Dog.tableUpdatedPublisher(in: crate, notifyOn: testQueue)
       .sink {
         dogDidFire = true
         semaphore.signal()
       }
-    try! fido.save(store: store)
+      .store(in: &subscriptions)
+    
+    try! fido.save(in: crate)
     XCTAssertEqual(semaphore.waitABit(), .success)
-
     XCTAssertFalse(personDidFire)
     XCTAssertTrue(dogDidFire)
-
-    dogSub.cancel()
-    subscription.cancel()
   }
 
   func testPublisherAll() {
@@ -198,11 +206,20 @@ final class RPModelTests: XCTestCase {
     let semaphore = DispatchSemaphore(value: 0)
     var expectedIDs: Set<Int64> = [1, 2]
     var fetchedPeople: [Person] = []
-    _ = Person.publisher(store: store)
+    
+    
+    let testQueue = DispatchQueue(label: "TestPublisherAll")
+    
+    var subscriptions = Set<AnyCancellable>()
+    Person.publisher(in: crate)
+      .receive(on: testQueue)
       .sink { (people) in
         fetchedPeople = people
         semaphore.signal()
-      }
+      }.store(in: &subscriptions)
+    
+    defer { subscriptions.removeAll() }
+    
     if semaphore.waitABit() == .timedOut {
       XCTFail()
     }
@@ -211,9 +228,8 @@ final class RPModelTests: XCTestCase {
     for person in fetchedPeople {
       XCTAssertTrue(expectedIDs.contains(person.id!))
     }
-    var alice = Person()
-    alice.name = "Alice"
-    try! alice.save(store: store)
+    var alice = Person(name: "Alice")
+    try! alice.save(in: crate)
     expectedIDs.insert(3)
 
     if semaphore.waitABit() == .timedOut {
@@ -227,36 +243,37 @@ final class RPModelTests: XCTestCase {
   }
 
   func testFetchUUID() {
-    var person: UUIDPerson = UUIDPerson()
     let uuid = UUID()
+
+    var person: UUIDPerson = UUIDPerson(specialID: uuid)
     person.specialID = uuid
-    try! person.save(store: store)
+    try! person.save(in: crate)
 
     let id = person.id
 
-    person = UUIDPerson.fetch(store: store, with: id!)!
+    person = try! UUIDPerson.fetch(from: crate, with: id!)!
+    XCTAssertEqual(person.id, id)
     XCTAssertEqual(person.specialID, uuid)
     XCTAssertEqual(person.optionalID, nil)
 
     let optionalID = UUID()
     person.optionalID = optionalID
-    try! person.save(store: store)
+    try! person.save(in: crate)
 
-    person = UUIDPerson.fetch(store: store, with: id!)!
+    person = try! UUIDPerson.fetch(from: crate, with: id!)!
     XCTAssertEqual(person.specialID, uuid)
     XCTAssertEqual(person.optionalID, optionalID)
   }
 
   func testSave() {
-    var alice: Person! = Person()
-    alice.name = "Alice"
-    try! alice.save(store: store)
+    var alice: Person! = Person(name: "Alice")
+    try! alice.save(in: crate)
     XCTAssertEqual(alice.id, 1)
     XCTAssertEqual(alice.name, "Alice")
     XCTAssertEqual(alice.birthday, nil)
     alice = nil  // dealloc so we fetch a fresh copy
 
-    let alice2 = Person.fetch(store: store, with: 1)!
+    let alice2 = try! Person.fetch(from: crate, with: 1)!
     XCTAssertEqual(alice2.id, 1)
     XCTAssertEqual(alice2.name, "Alice")
     XCTAssertEqual(alice2.birthday, nil)
@@ -264,8 +281,8 @@ final class RPModelTests: XCTestCase {
 
   func testFetch() {
     createFixtures()
-    let bob = Person.fetch(store: store, with: 1)
-    let carol = Person.fetch(store: store, with: 2)
+    let bob = try! Person.fetch(from: crate, with: 1)
+    let carol = try!  Person.fetch(from: crate, with: 2)
     XCTAssertNotNil(bob)
     XCTAssertEqual(bob!.id, 1)
     XCTAssertEqual(bob!.name, "Bob")

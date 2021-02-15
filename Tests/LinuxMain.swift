@@ -1,6 +1,6 @@
-import RPModelTests
+import LiteCrateTests
 import XCTest
 
 var tests = [XCTestCaseEntry]()
-tests += RPModelTests.allTests()
+tests += LiteCrateTests.allTests()
 XCTMain(tests)

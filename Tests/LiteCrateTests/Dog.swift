@@ -6,16 +6,12 @@
 //
 
 import Foundation
-import RPModel
+import LiteCrate
 
-struct Dog: RPModel {
-  init() {
-
-  }
-
-  @Column var id: Int64?
-  @Column var name: String
-  @Column var owner: Int64
+struct Dog: LCModel {
+  var id: Int64?
+  var name: String
+  var owner: Int64
 
   init(name: String, owner: Int64) {
     self.name = name
