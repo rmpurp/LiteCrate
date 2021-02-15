@@ -11,7 +11,7 @@ extension DispatchSemaphore {
 final class RPModelTests: XCTestCase {
   private let date1 = Date(timeIntervalSince1970: 123_456_789)
   
-  var store: DataStore!
+  var store: DataStore! = nil
   
   override func setUp() {
     store = try! DataStore(url: nil) { (db, currentVersion) in
