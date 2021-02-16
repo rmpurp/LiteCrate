@@ -1,5 +1,5 @@
-import XCTest
 import Combine
+import XCTest
 
 @testable import LiteCrate
 
@@ -11,7 +11,7 @@ extension DispatchSemaphore {
 
 final class LiteCrateTests: XCTestCase {
   private let date1 = Date(timeIntervalSince1970: 123_456_789)
-  
+
   var crate: LiteCrate! = nil
 
   let updateQueue = DispatchQueue(label: "UpdateQueue")
@@ -79,7 +79,7 @@ final class LiteCrateTests: XCTestCase {
     let id = person.id
     try! person.save(in: crate)
 
-    person = try!  UUIDPKPerson.fetch(from: crate,with: id)!
+    person = try! UUIDPKPerson.fetch(from: crate, with: id)!
 
     XCTAssertEqual(person.id, id)
     XCTAssertEqual(person.name, "Jill")
@@ -99,7 +99,7 @@ final class LiteCrateTests: XCTestCase {
 
     var receivedPerson: Person? = nil
     let semaphore = DispatchSemaphore(value: 0)
-    
+
     let testQueue = DispatchQueue(label: "testPrimaryKeyPublisher")
     var subscriptions = Set<AnyCancellable>()
     Person.publisher(in: crate, forPrimaryKey: alice.id)
@@ -141,9 +141,9 @@ final class LiteCrateTests: XCTestCase {
     alice.updatePublisher(in: crate)
       .receive(on: testQueue)
       .sink {
-      aliceChanged = $0
-      semaphore.signal()
-    }.store(in: &subscriptions)
+        aliceChanged = $0
+        semaphore.signal()
+      }.store(in: &subscriptions)
 
     alice.name = "Alice Changed"
     try! alice.save(in: crate)
@@ -157,36 +157,36 @@ final class LiteCrateTests: XCTestCase {
       XCTFail()
     }
   }
-  
+
   func testTableUpdatedPublisher() {
     var alice = Person(name: "Alice")
     let semaphore = DispatchSemaphore(value: 0)
     var personDidFire = false
-    
+
     let testQueue = DispatchQueue(label: "testTableUpdatedPublisherQueue")
-    
+
     var subscriptions = Set<AnyCancellable>()
-    defer { subscriptions.removeAll() } // Ensure subscriptions stays in scope
+    defer { subscriptions.removeAll() }  // Ensure subscriptions stays in scope
     Person.tableUpdatedPublisher(in: crate)
       .receive(on: testQueue)
       .sink {
         personDidFire = true
         semaphore.signal()
       }.store(in: &subscriptions)
-    
+
     try! alice.save(in: crate)
     XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertTrue(personDidFire)
-    
+
     personDidFire = false
     try! alice.save(in: crate)
     XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertTrue(personDidFire)
-    
+
     // Try inserting another object, make sure person publisher does not fire
     var dogDidFire = false
     personDidFire = false
-    
+
     let fido = Dog(name: "Fido", owner: 3)
     Dog.tableUpdatedPublisher(in: crate, notifyOn: testQueue)
       .sink {
@@ -194,7 +194,7 @@ final class LiteCrateTests: XCTestCase {
         semaphore.signal()
       }
       .store(in: &subscriptions)
-    
+
     try! fido.save(in: crate)
     XCTAssertEqual(semaphore.waitABit(), .success)
     XCTAssertFalse(personDidFire)
@@ -206,10 +206,9 @@ final class LiteCrateTests: XCTestCase {
     let semaphore = DispatchSemaphore(value: 0)
     var expectedIDs: Set<Int64> = [1, 2]
     var fetchedPeople: [Person] = []
-    
-    
+
     let testQueue = DispatchQueue(label: "TestPublisherAll")
-    
+
     var subscriptions = Set<AnyCancellable>()
     Person.publisher(in: crate)
       .receive(on: testQueue)
@@ -217,9 +216,9 @@ final class LiteCrateTests: XCTestCase {
         fetchedPeople = people
         semaphore.signal()
       }.store(in: &subscriptions)
-    
+
     defer { subscriptions.removeAll() }
-    
+
     if semaphore.waitABit() == .timedOut {
       XCTFail()
     }
@@ -282,7 +281,7 @@ final class LiteCrateTests: XCTestCase {
   func testFetch() {
     createFixtures()
     let bob = try! Person.fetch(from: crate, with: 1)
-    let carol = try!  Person.fetch(from: crate, with: 2)
+    let carol = try! Person.fetch(from: crate, with: 2)
     XCTAssertNotNil(bob)
     XCTAssertEqual(bob!.id, 1)
     XCTAssertEqual(bob!.name, "Bob")
