@@ -134,7 +134,12 @@ extension LCModel {
     try crate.executeUpdate("DELETE FROM \(Self.tableName) WHERE id = ?", values: [id])
   }
   
-  public func delete(from crate: LiteCrate) throws {
+  public static func delete(from crate: CrateProxy, allWhere sqlWhereClause: String? = nil, values: [Any]? = nil) throws {
+    let sqlWhereClause = sqlWhereClause ?? "1=1"
+    try crate.executeUpdate("DELETE FROM \(Self.tableName) WHERE \(sqlWhereClause)", values: values)
+  }
+  
+  public func delete(from crate: CrateProxy) throws {
     try crate.executeUpdate("DELETE FROM \(Self.tableName) WHERE id = ?", values: [id])
   }
 }
