@@ -66,6 +66,7 @@ public final class LiteCrate: CrateProxy {
     if isOnQueue { fatalError("Do not use the LiteCrate object in a transaction. Use the CrateProxy instead.") }
     return try self.queue.sync {
       try db.executeUpdate(sql, values: values)
+      notifyUpdates()
     }
   }
 
@@ -127,20 +128,23 @@ public final class LiteCrate: CrateProxy {
 
         try operation(crateProxy)
         guard db.commit() else { throw NSError() }
-
-        // Copy so they don't get wiped out by race condition
-        let tablesToSignal = self.tablesToSignal
-        defer { self.tablesToSignal = [] }
-
-        updateQueue.async { [weak self] in
-          guard let self = self else { return }
-          tablesToSignal.forEach {
-            self.tableChangedPublisher.send($0)
-          }
-        }
+        notifyUpdates()
       }
     } catch {
       db.rollback()
+    }
+  }
+  
+  private func notifyUpdates() {
+    // Copy so they don't get wiped out by race condition
+    let tablesToSignal = self.tablesToSignal
+    defer { self.tablesToSignal = [] }
+
+    updateQueue.async { [weak self] in
+      guard let self = self else { return }
+      tablesToSignal.forEach {
+        self.tableChangedPublisher.send($0)
+      }
     }
   }
 
