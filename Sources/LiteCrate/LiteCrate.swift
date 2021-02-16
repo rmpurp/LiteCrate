@@ -10,16 +10,18 @@ import FMDB
 import Foundation
 import SQLite3
 
-public protocol DatabaseProxy {
+public protocol CrateProxy {
   func executeUpdate(_ sql: String, values: [Any]?) throws
   func executeQuery(_ sql: String, values: [Any]?) throws -> FMResultSet
   var lastInsertRowId: Int64 { get }
 }
 
-public final class LiteCrate {
+public final class LiteCrate: CrateProxy {
+  public var lastInsertRowId: Int64 { db.lastInsertRowId }
+  
   private var db: FMDatabase!
-
-  private final class TransactionDatabaseProxy: DatabaseProxy {
+  
+  private final class TransactionCrateProxy: CrateProxy {
     var db: FMDatabase
     var isEnabled = true
 
@@ -57,18 +59,18 @@ public final class LiteCrate {
     target: nil)
 
   let testQueueKey = DispatchSpecificKey<Void>()
-
   var isOnQueue: Bool { DispatchQueue.getSpecific(key: testQueueKey) != nil }
-
   var tablesToSignal = Set<String>()
 
-  internal func executeUpdate(_ sql: String, values: [Any]?) throws {
+  public func executeUpdate(_ sql: String, values: [Any]?) throws {
+    if isOnQueue { fatalError("Do not use the LiteCrate object in a transaction. Use the CrateProxy instead.") }
     return try self.queue.sync {
       try db.executeUpdate(sql, values: values)
     }
   }
 
-  internal func executeQuery(_ sql: String, values: [Any]?) throws -> FMResultSet {
+  public func executeQuery(_ sql: String, values: [Any]?) throws -> FMResultSet {
+    if isOnQueue { fatalError("Do not use the LiteCrate object in a transaction. Use the CrateProxy instead.") }
     return try self.queue.sync {
       return try db.executeQuery(sql, values: values)
     }
@@ -78,7 +80,7 @@ public final class LiteCrate {
 
   public init(
     url: URL?, updateQueue: DispatchQueue = DispatchQueue.main,
-    migration: (DatabaseProxy, inout Int64) throws -> Void
+    migration: (CrateProxy, inout Int64) throws -> Void
   ) rethrows {
     queue.setSpecific(key: testQueueKey, value: ())
     self.updateQueue = updateQueue
@@ -114,16 +116,16 @@ public final class LiteCrate {
     }
     db = nil
   }
-
-  public func inTransaction(operation: (DatabaseProxy) throws -> Void) rethrows {
+  
+  public func inTransaction(operation: (CrateProxy) throws -> Void) rethrows {
     do {
       try queue.sync {
         db.beginTransaction()
 
-        let databaseProxy = TransactionDatabaseProxy(db: db)
-        defer { databaseProxy.isEnabled = false }
+        let crateProxy = TransactionCrateProxy(db: db)
+        defer { crateProxy.isEnabled = false }
 
-        try operation(databaseProxy)
+        try operation(crateProxy)
         guard db.commit() else { throw NSError() }
 
         // Copy so they don't get wiped out by race condition

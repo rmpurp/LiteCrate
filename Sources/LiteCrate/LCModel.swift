@@ -79,33 +79,31 @@ extension LCModel {
       .eraseToAnyPublisher()
   }
 
-  public static func fetch(from: LiteCrate, with primaryKey: ID) throws -> Self? {
-    return try Self.fetchAll(from: from, forAllWhere: "id = ?", values: [primaryKey]).first
+  public static func fetch(from crate: CrateProxy, with primaryKey: ID) throws -> Self? {
+    return try Self.fetchAll(from: crate, forAllWhere: "id = ?", values: [primaryKey]).first
   }
 
   /// Blocking call to fetch
   public static func fetchAll(
-    from crate: LiteCrate, forAllWhere sqlWhereClause: String? = nil, values: [Any]? = nil
+    from crate: CrateProxy, forAllWhere sqlWhereClause: String? = nil, values: [Any]? = nil
   )
     throws -> [Self]
   {
     // TODO: Properly rewrite query if where clause is null
     let sqlWhereClause = sqlWhereClause ?? "1=1"
     var returnValue = [Self]()
-
-    try crate.inTransaction { db in
-      guard
-        let rs = try? db.executeQuery(
-          "SELECT * FROM \(Self.tableName) WHERE \(sqlWhereClause)",
-          values: values)
-      else { return }
-
-      let decoder = DatabaseDecoder(resultSet: rs)
-      while rs.next() {
-        try returnValue.append(Self(from: decoder))
-      }
+    
+    guard
+      let rs = try? crate.executeQuery(
+        "SELECT * FROM \(Self.tableName) WHERE \(sqlWhereClause)",
+        values: values)
+    else { throw NSError() }
+    
+    let decoder = DatabaseDecoder(resultSet: rs)
+    while rs.next() {
+      try returnValue.append(Self(from: decoder))
     }
-
+    
     return returnValue
   }
 }
