@@ -18,7 +18,6 @@ final class LiteCrateTests: XCTestCase {
 
   override func setUp() {
     crate = try! LiteCrate(url: nil, updateQueue: updateQueue) { (db, currentVersion) in
-      NSLog("VERSION: %@", currentVersion)
       if currentVersion < 1 {
         try db.executeUpdate(
           """

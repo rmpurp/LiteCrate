@@ -91,20 +91,17 @@ extension LCModel {
   {
     // TODO: Properly rewrite query if where clause is null
     let sqlWhereClause = sqlWhereClause ?? "1=1"
-    var returnValue = [Self]()
-    
-    guard
-      let rs = try? crate.executeQuery(
-        "SELECT * FROM \(Self.tableName) WHERE \(sqlWhereClause)",
-        values: values)
-    else { throw NSError() }
-    
-    let decoder = DatabaseDecoder(resultSet: rs)
-    while rs.next() {
-      try returnValue.append(Self(from: decoder))
+
+    return try crate.executeQuery(
+      "SELECT * FROM \(Self.tableName) WHERE \(sqlWhereClause)",
+      values: values) { (rs) -> [Self] in
+      let decoder = DatabaseDecoder(resultSet: rs)
+      var returnValue = [Self]()
+      while rs.next() {
+        try returnValue.append(Self(from: decoder))
+      }
+      return returnValue
     }
-    
-    return returnValue
   }
 }
 

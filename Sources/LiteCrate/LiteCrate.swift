@@ -12,7 +12,7 @@ import SQLite3
 
 public protocol CrateProxy {
   func executeUpdate(_ sql: String, values: [Any]?) throws
-  func executeQuery(_ sql: String, values: [Any]?) throws -> FMResultSet
+  func executeQuery<T>(_ sql: String, values: [Any]?, transformOutput: (FMResultSet) throws -> T) throws -> T
   var lastInsertRowId: Int64 { get }
 }
 
@@ -36,11 +36,13 @@ public final class LiteCrate: CrateProxy {
       try db.executeUpdate(sql, values: values)
     }
 
-    func executeQuery(_ sql: String, values: [Any]?) throws -> FMResultSet {
+    func executeQuery<T>(_ sql: String, values: [Any]?, transformOutput: (FMResultSet) throws -> T) throws -> T {
       guard isEnabled else {
         fatalError("Do not use this proxy outside of the transaction closure")
       }
-      return try db.executeQuery(sql, values: values)
+      let rs = try db.executeQuery(sql, values: values)
+      defer { rs.close() }
+      return try transformOutput(rs)
     }
 
     var lastInsertRowId: Int64 {
@@ -70,10 +72,12 @@ public final class LiteCrate: CrateProxy {
     }
   }
 
-  public func executeQuery(_ sql: String, values: [Any]?) throws -> FMResultSet {
+  public func executeQuery<T>(_ sql: String, values: [Any]?, transformOutput: (FMResultSet) throws -> T) throws -> T {
     if isOnQueue { fatalError("Do not use the LiteCrate object in a transaction. Use the CrateProxy instead.") }
     return try self.queue.sync {
-      return try db.executeQuery(sql, values: values)
+      let rs = try db.executeQuery(sql, values: values)
+      defer { rs.close() }
+      return try transformOutput(rs)
     }
   }
 
@@ -99,7 +103,7 @@ public final class LiteCrate: CrateProxy {
 
         let tableName = String(cString: cTableName)
 
-        NSLog("TABLE NAME: %@", tableName)
+//        NSLog("TABLE NAME: %@", tableName)
 
         liteCrate.tablesToSignal.insert(tableName)
       }, raw)
