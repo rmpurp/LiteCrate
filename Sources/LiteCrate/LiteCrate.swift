@@ -20,7 +20,7 @@ public actor LiteCrate {
   private var tablesToSignalWrapper = TablesToSignalWrapper()
   private var notifier = Notifier()
   
-  init(url: URL?, migration: (TransactionProxy, inout Int64) throws -> Void) throws {
+  public init(url: URL?, migration: (TransactionProxy, inout Int64) throws -> Void) throws {
     db = FMDatabase(url: url)
     db.open()
     
@@ -46,11 +46,11 @@ public actor LiteCrate {
       }, raw)
   }
   
-  func close() {
+  public func close() {
     db.close()
   }
   
-  func stream<T: LCModel>(for type: T.Type, where sqlWhereClause: String? = nil, values: [Any]? = nil) -> AsyncThrowingStream<[T], Error> {
+  public func stream<T: LCModel>(for type: T.Type, where sqlWhereClause: String? = nil, values: [Any]? = nil) -> AsyncThrowingStream<[T], Error> {
     let sqlWhereClause = sqlWhereClause ?? "1=1"
     
     let localNotifier = notifier // Notifier has internal synchronization
@@ -74,7 +74,7 @@ public actor LiteCrate {
     }
   }
   
-  func inTransaction<T>(block: (TransactionProxy) throws -> T) throws -> T {
+  public func inTransaction<T>(block: (TransactionProxy) throws -> T) throws -> T {
     let proxy = TransactionProxy(db: db)
     
     defer { proxy.isEnabled = false }
