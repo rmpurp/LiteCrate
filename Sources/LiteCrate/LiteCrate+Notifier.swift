@@ -8,11 +8,10 @@
 import Foundation
 import FMDB
 
-@available(macOSApplicationExtension 12.0, *)
 extension LiteCrate {
   internal class Notifier {
     private var subscribers = [TableSubscription]()
-
+    
     private var lock = NSLock()
     
     func notify(_ tableName: String) {
@@ -24,11 +23,11 @@ extension LiteCrate {
       }
     }
     
-    func subscribe(for text: String, preparedStatement: FMResultSet) -> TableSubscription {
+    func subscribe(for text: String) -> TableSubscription {
       lock.lock()
       defer { lock.unlock() }
       
-      let subscription = TableSubscription(text, preparedStatement: preparedStatement)
+      let subscription = TableSubscription(text)
       subscribers.append(subscription)
       return subscription
     }

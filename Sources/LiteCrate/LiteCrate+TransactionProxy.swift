@@ -8,17 +8,31 @@
 import Foundation
 import FMDB
 
-@available(macOSApplicationExtension 12.0, *)
 extension LiteCrate {
-  internal final class TransactionProxy: CrateProxy {
-    func executeUpdate(_ sql: String, values: [Any]?) throws {
+  public final class TransactionProxy {
+    public func fetch<T>(_ type: T.Type, with id: T.ID) throws -> T? where T : LCModel {
+      return try fetch(type, allWhere: "id = ?", values: [id]).first
+    }
+    
+    public func fetch<T>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, values: [Any]? = nil) throws  -> [T] where T : LCModel {
+      let sqlWhereClause = sqlWhereClause ?? "1=1"
+      let resultSet = try db.executeQuery("SELECT * FROM \(T.tableName) WHERE \(sqlWhereClause)", values: values)
+      let decoder = DatabaseDecoder(resultSet: resultSet)
+      var models = [T]()
+      while resultSet.next() {
+        try models.append(T(from: decoder))
+      }
+      return models
+    }
+    
+    public func executeUpdate(_ sql: String, values: [Any]? = nil) throws {
       guard isEnabled else {
         fatalError("Do not use this proxy outside of the transaction closure")
       }
       try db.executeUpdate(sql, values: values)
     }
     
-    func executeQuery<T>(_ sql: String, values: [Any]?, transformOutput: (FMResultSet) throws -> T) throws -> T {
+    public func executeQuery<T>(_ sql: String, values: [Any]? = nil, transformOutput: (FMResultSet) throws -> T) throws -> T {
       guard isEnabled else {
         fatalError("Do not use this proxy outside of the transaction closure")
       }
@@ -27,7 +41,7 @@ extension LiteCrate {
       return try transformOutput(rs)
     }
     
-    func executeQuery(_ sql: String, values: [Any]?) throws -> FMResultSet {
+    public func executeQuery(_ sql: String, values: [Any]? = nil) throws -> FMResultSet {
       guard isEnabled else {
         fatalError("Do not use this proxy outside of the transaction closure")
       }
@@ -35,42 +49,51 @@ extension LiteCrate {
     }
     
     
-    func save<T>(_ model: T) throws where T : LCModel {
+    public func save<T>(_ model: T) throws where T : LCModel {
       let (columnString, placeholders, values) = model.insertValues
       try db.executeUpdate(
         "INSERT OR REPLACE INTO \(T.tableName)(\(columnString)) VALUES (\(placeholders)) ",
         values: values)
     }
     
-    func delete<T>(_ model: T) throws where T : LCModel {
+    public func delete<T>(_ model: T) throws where T : LCModel {
       try db.executeUpdate("DELETE FROM \(T.tableName) WHERE id = ?", values: [model.id])
-    }
-    
-    func delete<T>(_ type: T.Type) throws where T : LCModel {
-      try delete(type, allWhere: nil, values: nil)
-    }
-    
-    func delete<T>(_ type: T.Type, allWhere sqlWhereClause: String?) throws where T : LCModel {
-      try delete(type, allWhere: sqlWhereClause, values: nil)
     }
     
     public func delete<T: LCModel>(_ type: T.Type, with id: T.ID) throws {
       try db.executeUpdate("DELETE FROM \(T.tableName) WHERE id = ?", values: [id])
     }
     
-    public func delete<T: LCModel>(_ type: T.Type, allWhere sqlWhereClause: String?, values: [Any]?) throws {
+    public func delete<T: LCModel>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, values: [Any]? = nil) throws {
       let sqlWhereClause = sqlWhereClause.flatMap { "WHERE \($0)" } ?? ""
       try db.executeUpdate("DELETE FROM \(T.tableName) \(sqlWhereClause)", values: values)
     }
     
-    public func delete(from crate: CrateProxy) throws {
-    }
+    internal var db: FMDatabase
+    internal var isEnabled = true
     
-    var db: FMDatabase
-    var isEnabled = true
-    
-    init(db: FMDatabase) {
+    internal init(db: FMDatabase) {
       self.db = db
     }
   }
 }
+
+internal extension LiteCrate.TransactionProxy {
+  func getCurrentSchemaVersion() throws -> Int64 {
+    let rs = try executeQuery("PRAGMA user_version", values: nil)
+    
+    if rs.next() {
+      let currentVersion = rs.longLongInt(forColumnIndex: 0)
+      NSLog("DB at version %d", currentVersion)
+      return currentVersion
+    } else {
+      fatalError("TODO: Change this to reasonable error")
+    }
+  }
+  
+  func setCurrentSchemaVersion(version: Int64) throws {
+    try executeUpdate(String(format: "PRAGMA user_version = %lld", version), values: [])
+    // Being very careful to avoid injection vulnerability; ? is not valid here.
+  }
+}
+
