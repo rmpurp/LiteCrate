@@ -96,4 +96,3 @@ internal extension LiteCrate.TransactionProxy {
     // Being very careful to avoid injection vulnerability; ? is not valid here.
   }
 }
-
