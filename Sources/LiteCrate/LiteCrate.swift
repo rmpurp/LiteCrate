@@ -74,6 +74,7 @@ public actor LiteCrate {
     }
   }
   
+  @discardableResult
   public func inTransaction<T>(block: (TransactionProxy) throws -> T) throws -> T {
     let proxy = TransactionProxy(db: db)
     
