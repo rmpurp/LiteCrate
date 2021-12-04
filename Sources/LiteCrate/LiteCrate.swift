@@ -14,11 +14,8 @@ enum LiteCrateError: Error {
   case commitError
 }
 
-public actor LiteCrate {
-  
+public class LiteCrate {
   private var db: FMDatabase
-  private var tablesToSignalWrapper = TablesToSignalWrapper()
-  private var notifier = Notifier()
   
   public init(url: URL?, migration: (TransactionProxy, inout Int64) throws -> Void) throws {
     db = FMDatabase(url: url)
@@ -29,49 +26,10 @@ public actor LiteCrate {
       try migration(db, &currentVersion)
       try db.setCurrentSchemaVersion(version: currentVersion)
     }
-    
-    self.tablesToSignalWrapper = TablesToSignalWrapper()
-    let raw = Unmanaged.passUnretained(self.tablesToSignalWrapper).toOpaque()
-    
-    sqlite3_update_hook(
-      OpaquePointer(db.sqliteHandle),
-      { (aux, type, cDatabaseName, cTableName, rowid) in
-        guard let cTableName = cTableName, let aux = aux else { return }
-        
-        let notifier = Unmanaged<TablesToSignalWrapper>.fromOpaque(aux).takeUnretainedValue()
-        
-        let tableName = String(cString: cTableName)
-        
-        notifier.insert(tableName)
-      }, raw)
   }
   
   public func close() {
     db.close()
-  }
-  
-  public func stream<T: LCModel>(for type: T.Type, where sqlWhereClause: String? = nil, values: [Any]? = nil) -> AsyncThrowingStream<[T], Error> {
-    let sqlWhereClause = sqlWhereClause ?? "1=1"
-    
-    let localNotifier = notifier // Notifier has internal synchronization
-    
-    // Force a fetch immediately
-    defer { notifier.notify(type.tableName) }
-    
-    return AsyncThrowingStream { continuation in
-      let subscription = notifier.subscribe(for: type.tableName)
-      subscription.myAction = {
-        do {
-          try continuation.yield(self.fetch(T.self, allWhere: sqlWhereClause, values: values))
-        } catch {
-          continuation.finish(throwing: error)
-        }
-      }
-      
-      continuation.onTermination = { @Sendable termination in
-        localNotifier.unsubscribe(subscription)
-      }
-    }
   }
   
   @discardableResult
@@ -80,7 +38,6 @@ public actor LiteCrate {
     
     defer { proxy.isEnabled = false }
     
-    tablesToSignalWrapper.clear()
     
     do {
       proxy.db.beginTransaction()
@@ -89,11 +46,6 @@ public actor LiteCrate {
       let success = proxy.db.commit()
       proxy.isEnabled = false
       if !success { throw LiteCrateError.commitError }
-      
-      for table in tablesToSignalWrapper.tablesToSignal {
-        lc_log("Notifying changes in \(table)")
-        notifier.notify(table)
-      }
       
       return returnValue
     } catch {
@@ -147,7 +99,6 @@ extension LiteCrate {
       try proxy.delete(model)
     }
   }
-  
   
   public func delete<T>(_ type: T.Type, with id: T.ID) throws where T : LCModel {
     try inTransaction { proxy in
