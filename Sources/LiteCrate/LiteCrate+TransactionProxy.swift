@@ -24,7 +24,19 @@ extension LiteCrate {
       }
       return models
     }
-    
+
+    public func fetch<T>(_ type: T.Type, joining joinTable: String, on joinClause: String, allWhere sqlWhereClause: String? = nil, values: [Any]? = nil) throws  -> [T] where T : LCModel {
+      let sqlWhereClause = sqlWhereClause ?? "1=1"
+      let resultSet = try db.executeQuery("SELECT \(T.tableName).* FROM \(T.tableName) INNER JOIN \(joinTable) ON \(joinClause) WHERE \(sqlWhereClause)", values: values)
+      let decoder = DatabaseDecoder(resultSet: resultSet)
+      var models = [T]()
+      while resultSet.next() {
+        try models.append(T(from: decoder))
+      }
+      return models
+
+    }
+      
     public func executeUpdate(_ sql: String, values: [Any]? = nil) throws {
       guard isEnabled else {
         fatalError("Do not use this proxy outside of the transaction closure")
