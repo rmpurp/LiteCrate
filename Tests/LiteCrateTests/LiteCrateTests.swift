@@ -12,4 +12,9 @@ extension DispatchSemaphore {
 
 @available(macOS 12.0, *)
 final class LiteCrateTests: XCTestCase {
+  func testTableCreation() {
+    let person = Person(name: "arst", dogID: UUID())
+    print(person.creationStatement)
+    XCTAssertTrue(true)
+  }
 }

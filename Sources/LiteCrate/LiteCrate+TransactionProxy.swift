@@ -10,6 +10,10 @@ import FMDB
 
 extension LiteCrate {
   public final class TransactionProxy {
+    public func createTable<T>(_ modelInstance: T) throws where T : LCModel {
+      try self.executeUpdate(modelInstance.creationStatement)
+    }
+    
     public func fetch<T>(_ type: T.Type, with id: T.ID) throws -> T? where T : LCModel {
       return try fetch(type, allWhere: "id = ?", values: [id]).first
     }
