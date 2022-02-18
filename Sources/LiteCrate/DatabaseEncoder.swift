@@ -89,6 +89,8 @@ class DatabaseEncoder: Encoder {
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable {
       if let date = value as? Date {
         encoder.columnToKey[key.stringValue] = date.timeIntervalSince1970
+      } else if let data = value as? Data {
+        encoder.columnToKey[key.stringValue] = data
       } else if let uuid = value as? UUID {
         encoder.columnToKey[key.stringValue] = uuid.uuidString
       } else {

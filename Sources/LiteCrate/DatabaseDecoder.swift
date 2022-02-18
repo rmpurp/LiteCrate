@@ -80,11 +80,13 @@ struct DatabaseDecoder: Decoder {
     func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64 {
       return resultSet.unsignedLongLongInt(forColumn: key.stringValue)
     }
-
+    
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
       switch type {
       case is Date.Type, is Date?.Type:
         return Date(timeIntervalSince1970: resultSet.double(forColumn: key.stringValue)) as! T
+      case is Data.Type, is Data?.Type:
+        return resultSet.data(forColumn: key.stringValue) as! T
       case is UUID.Type, is UUID?.Type:
         guard
           let uuid = resultSet.string(forColumn: key.stringValue).flatMap(UUID.init(uuidString:))
