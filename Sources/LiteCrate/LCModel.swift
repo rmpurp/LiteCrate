@@ -11,7 +11,7 @@ import Foundation
 
 public protocol LCModel: Identifiable, Equatable, Codable where ID == UUID {
   
-  override var id: ID { get set }
+  override var id: ID { get }
   //  var everSynced: Bool { get set }
   //  var isDirty: Bool { get set }
   static var foreignKeys: [ForeignKey] { get }
