@@ -29,7 +29,7 @@ extension LiteCrate {
       return models
     }
 
-    public func fetch<T>(_ type: T.Type, joining joinTable: String, on joinClause: String, allWhere sqlWhereClause: String? = nil, values: [SqliteRepresentable?] = []) throws  -> [T] where T : LCModel {
+    public func fetch<T>(_ type: T.Type, joining joinTable: String, on joinClause: String, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws  -> [T] where T : LCModel {
       let sqlWhereClause = sqlWhereClause ?? "TRUE"
       let cursor = try db.query("SELECT \(T.tableName).* FROM \(T.tableName) INNER JOIN \(joinTable) ON \(joinClause) WHERE \(sqlWhereClause)", values)
       let decoder = DatabaseDecoder(cursor: cursor)
@@ -41,14 +41,14 @@ extension LiteCrate {
 
     }
       
-    public func execute(_ sql: String, values: [SqliteRepresentable?] = []) throws {
+    public func execute(_ sql: String, _ values: [SqliteRepresentable?] = []) throws {
       guard isEnabled else {
         fatalError("Do not use this proxy outside of the transaction closure")
       }
       try db.execute(sql, values)
     }
     
-    public func query(_ sql: String, values: [SqliteRepresentable?] = []) throws -> Cursor {
+    public func query(_ sql: String, _ values: [SqliteRepresentable?] = []) throws -> Cursor {
       guard isEnabled else {
         fatalError("Do not use this proxy outside of the transaction closure")
       }
@@ -71,7 +71,7 @@ extension LiteCrate {
       try db.execute("DELETE FROM \(T.tableName) WHERE id = ?", [id])
     }
     
-    public func delete<T: LCModel>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, values: [SqliteRepresentable?] = []) throws {
+    public func delete<T: LCModel>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws {
       let sqlWhereClause = sqlWhereClause.flatMap { "WHERE \($0)" } ?? ""
       try db.execute("DELETE FROM \(T.tableName) \(sqlWhereClause)", values)
     }
@@ -99,7 +99,7 @@ internal extension LiteCrate.TransactionProxy {
   }
   
   func setCurrentSchemaVersion(version: Int64) throws {
-    try execute(String(format: "PRAGMA user_version = %lld", version), values: [])
+    try execute(String(format: "PRAGMA user_version = %lld", version), [])
     // Being very careful to avoid injection vulnerability; ? is not valid here.
   }
 }
