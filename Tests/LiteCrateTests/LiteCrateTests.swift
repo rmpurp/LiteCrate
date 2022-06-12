@@ -17,4 +17,29 @@ final class LiteCrateTests: XCTestCase {
     print(person.creationStatement)
     XCTAssertTrue(true)
   }
+  
+  func testSaveAndFetch() throws {
+    let person = Person(name: "Bob", dogID: UUID())
+    let crate = try LiteCrate(url: nil) { proxy, version in
+      try proxy.execute(person.creationStatement)
+    }
+    try crate.inTransaction { proxy in
+      try proxy.save(person)
+    }
+
+    var reached: Bool = false
+    
+    try crate.inTransaction { proxy in
+      guard let fetchedPerson = try proxy.fetch(Person.self, with: person.id) else {
+        XCTFail()
+        return
+      }
+      XCTAssertEqual(fetchedPerson.id, person.id)
+      XCTAssertEqual(fetchedPerson.name, "Bob")
+      XCTAssertEqual(fetchedPerson.dogID, person.dogID)
+      reached = true
+    }
+    XCTAssertTrue(reached)
+    
+  }
 }

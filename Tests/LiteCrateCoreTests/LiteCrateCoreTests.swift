@@ -7,11 +7,12 @@ final class LiteCrateCoreTests: XCTestCase {
         // Use XCTAssert and related functions to verify your tests produce the correct
         // results.
       let db = try Database(":memory:")
-      try db.execute("CREATE TABLE Test(a, b, c, d, e, f)")
+      try db.execute("CREATE TABLE Test(a, b, c, d, e, f, g, h, i)")
+      let testUUID = UUID()
       let testData = "datadatadatablob".data(using: .utf8)!
       let testDate = Date()
-      try db.execute("INSERT INTO Test VALUES(?, ?, ?, ?, ?, ?)", ["test", 12321, 3.14, testData, nil, testDate])
-      let cursor = try db.query("SELECT a, b, c, d, e, f from TEST")
+      try db.execute("INSERT INTO Test VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)", ["test", 12321, 3.14, testData, nil, testDate, testUUID, true, false])
+      let cursor = try db.query("SELECT a, b, c, d, e, f, g, h, i from TEST")
       XCTAssertTrue(cursor.step())
       XCTAssertEqual(cursor.string(for: 0), "test")
       XCTAssertEqual(cursor.int(for: 1), 12321)
@@ -19,5 +20,9 @@ final class LiteCrateCoreTests: XCTestCase {
       XCTAssertEqual(cursor.data(for: 3), testData)
       XCTAssertTrue(cursor.isNull(for: 4))
       XCTAssertLessThanOrEqual(abs(cursor.date(for: 5).timeIntervalSince(testDate)), 1.0)
+      XCTAssertEqual(cursor.uuid(for: 6), testUUID)
+      XCTAssertTrue(cursor.bool(for: 7))
+      XCTAssertFalse(cursor.bool(for: 8))
+
     }
 }

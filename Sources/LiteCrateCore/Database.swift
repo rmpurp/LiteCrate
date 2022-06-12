@@ -8,8 +8,8 @@
 import Foundation
 import sqlite3
 
-private typealias SqliteDatabase = OpaquePointer
-private typealias SqliteStatement = OpaquePointer
+typealias SqliteDatabase = OpaquePointer
+
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
 public enum DatabaseError: Error, CustomDebugStringConvertible {
@@ -27,123 +27,9 @@ public enum DatabaseError: Error, CustomDebugStringConvertible {
   case unknown(msg: String)
 }
 
-public enum SqliteType {
-  case integer(val: Int64)
-  case real(val: Double)
-  case text(val: String)
-  case blob(val: Data)
-}
-
-public protocol SqliteRepresentable {
-  var asSqliteType: SqliteType { get }
-}
-
-extension Int64: SqliteRepresentable {
-  public var asSqliteType: SqliteType { return .integer(val: self) }
-}
-
-extension Double: SqliteRepresentable {
-  public var asSqliteType: SqliteType { return .real(val: self) }
-}
-
-extension String: SqliteRepresentable {
-  public var asSqliteType: SqliteType { return .text(val: self) }
-}
-
-extension Data: SqliteRepresentable {
-  public var asSqliteType: SqliteType { return .blob(val: self) }
-}
-
-extension Date: SqliteRepresentable {
-  public var asSqliteType: SqliteType {
-    return .integer(val: Int64(timeIntervalSince1970))
-  }
-}
-
-public class Cursor {
-  private let database: Database
-  private let statement: SqliteStatement
-  private var done: Bool = false
-  private var closed: Bool = false
-  
-  private var stepError: DatabaseError? = nil
-  
-  fileprivate init(database: Database, statement: SqliteStatement) {
-    self.database = database
-    self.statement = statement
-  }
-  
-  public func step() -> Bool {
-    do {
-      return try stepWithError()
-    } catch {
-      return false
-    }
-  }
-  
-  public func stepWithError() throws -> Bool {
-    guard !closed else { fatalError("Operating on a closed statement.") }
-    let resultCode = sqlite3_step(statement)
-    switch resultCode {
-    case SQLITE_ROW:
-      return true
-    case SQLITE_OK: /* Is this even possible? */ fallthrough
-    case SQLITE_DONE:
-      done = true
-      return false
-    default:
-      defer { sqlite3_finalize(statement) }
-      throw database.getError()
-    }
-  }
-  
-  public func string(for index: Int32) -> String {
-    guard !closed else { fatalError("Operating on a closed statement.") }
-    return String(cString: sqlite3_column_text(statement, index))
-  }
-  
-  public func int(for index: Int32) -> Int64 {
-    guard !closed else { fatalError("Operating on a closed statement.") }
-    return sqlite3_column_int64(statement, index)
-  }
-  
-  public func double(for index: Int32) -> Double {
-    guard !closed else { fatalError("Operating on a closed statement.") }
-    return sqlite3_column_double(statement, index)
-  }
-  
-  public func data(for index: Int32) -> Data {
-    guard !closed else { fatalError("Operating on a closed statement.") }
-    let bytes = sqlite3_column_blob(statement, index)!
-    let count = sqlite3_column_bytes(statement, index)
-    return Data(bytes: bytes, count: Int(count))
-  }
-  
-  public func date(for index: Int32) -> Date {
-    let timeInterval = TimeInterval(int(for: index))
-    return Date(timeIntervalSince1970: timeInterval)
-  }
-  
-  public func isNull(for index: Int32) -> Bool {
-    guard !closed else { fatalError("Operating on a closed statement.") }
-    return sqlite3_column_text(statement, index) == nil
-  }
-  
-  /// Close this statement.
-  /// It is OK to call this multiple times.
-  /// This will be automatically called when this object is deinited.
-  public func close() {
-    guard !closed else { return }
-    sqlite3_finalize(statement)
-  }
-  
-  deinit {
-    close()
-  }
-}
-
 public class Database {
   private let handle: SqliteDatabase
+  private var closed: Bool = false
   
   public init(_ path: String) throws {
     var ppDb: SqliteDatabase?
@@ -155,7 +41,8 @@ public class Database {
     }
   }
   
-  fileprivate func getError() -> DatabaseError {
+  func getError() -> DatabaseError {
+    guard !closed else { fatalError("Operating on a closed database.") }
     let errorCode = sqlite3_errcode(handle)
     let errorMessage = String(cString: sqlite3_errmsg(handle))
     switch errorCode {
@@ -166,6 +53,7 @@ public class Database {
   }
   
   public func query(_ statement: String, _ parameters: [SqliteRepresentable?] = []) throws -> Cursor {
+    guard !closed else { fatalError("Operating on a closed database.") }
     var ppStmt: SqliteStatement?
     let errorCode = sqlite3_prepare_v2(handle, statement, Int32(statement.lengthOfBytes(using: .utf8)), &ppStmt, nil)
     guard errorCode == SQLITE_OK, let ppStmt else {
@@ -195,11 +83,30 @@ public class Database {
   }
   
   public func execute(_ statement: String, _ parameters: [SqliteRepresentable?] = []) throws {
+    guard !closed else { fatalError("Operating on a closed database.") }
       let cursor = try query(statement, parameters)
       _ = try cursor.stepWithError()
-    }
+  }
+  
+  public func close() {
+    guard !closed else { return }
+    defer { closed = true }
+    sqlite3_close_v2(handle)
+  }
+  
+  public func beginTransaction() throws {
+    try execute("BEGIN DEFERRED")
+  }
+  
+  public func rollback() throws {
+    try execute("ROLLBACK")
+  }
+  
+  public func commit() throws {
+    try execute("COMMIT")
+  }
   
   deinit {
-    sqlite3_close_v2(handle)
+    close()
   }
 }

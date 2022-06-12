@@ -18,19 +18,6 @@ public protocol LCModel: Identifiable, Equatable, Codable where ID == UUID {
 }
 
 extension LCModel {
-  internal var insertValues: (columnString: String, placeholders: String, values: [Any]) {
-    let encoder = DatabaseEncoder()
-    try! self.encode(to: encoder)
-    let columnsToValue = encoder.columnToKey
-    // If there is an error here, it will be caught and resolved during developement
-    
-    let columns = [String](columnsToValue.keys)
-    let columnString = columns.joined(separator: ",")
-    let placeholders = String(String(repeating: "?,", count: columnsToValue.count).dropLast())
-    let values = columns.map { columnsToValue[$0]! }
-    return (columnString, placeholders, values)
-  }
-  
   internal var creationStatement: String {
     let encoder = SchemaEncoder()
     try! self.encode(to: encoder)
@@ -70,6 +57,6 @@ public struct ForeignKey {
   }
   
   fileprivate var creationStatement: String {
-    return "FOREIGN KEY (\(columnNames.joined(separator: ", "))) REFERENCES \(targetTable)(\(targetColumns.joined(separator: ", ")))" + (self.onCascadeDelete ? " ON CASCADE DELETE" : "")
+    return "FOREIGN KEY (\(columnNames.joined(separator: ", "))) REFERENCES \(targetTable)(\(targetColumns.joined(separator: ", ")))" + (self.onCascadeDelete ? " ON DELETE CASCADE" : "")
   }
 }

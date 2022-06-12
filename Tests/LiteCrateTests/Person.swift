@@ -17,7 +17,7 @@ struct Person: LCModel {
   var birthday: Date?
   var dogID: UUID
   
-  static var foreignKeys = [ForeignKey("dogID", references: "Dog", targetColumn: "id"), ForeignKey(["catID1", "catID2"], references: "Cat", targetColumns: ["id1", "id2"], onCascadeDelete: true)]
+//  static var foreignKeys = [ForeignKey("dogID", references: "Dog", targetColumn: "id"), ForeignKey(["catID1", "catID2"], references: "Cat", targetColumns: ["id1", "id2"], onCascadeDelete: true)]
 }
 
 extension Person: Hashable { }

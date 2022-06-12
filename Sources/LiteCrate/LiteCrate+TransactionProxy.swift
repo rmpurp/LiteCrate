@@ -6,89 +6,80 @@
 //
 
 import Foundation
-import FMDB
+import LiteCrateCore
 
 extension LiteCrate {
   public final class TransactionProxy {
     public func createTable<T>(_ modelInstance: T) throws where T : LCModel {
-      try self.executeUpdate(modelInstance.creationStatement)
+      try self.execute(modelInstance.creationStatement)
     }
     
     public func fetch<T>(_ type: T.Type, with id: T.ID) throws -> T? where T : LCModel {
-      return try fetch(type, allWhere: "id = ?", values: [id]).first
+      return try fetch(type, allWhere: "id = ?", [id]).first
     }
     
-    public func fetch<T>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, values: [Any]? = nil) throws  -> [T] where T : LCModel {
-      let sqlWhereClause = sqlWhereClause ?? "1=1"
-      let resultSet = try db.executeQuery("SELECT * FROM \(T.tableName) WHERE \(sqlWhereClause)", values: values)
-      let decoder = DatabaseDecoder(resultSet: resultSet)
+    public func fetch<T>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws  -> [T] where T : LCModel {
+      let sqlWhereClause = sqlWhereClause ?? "TRUE"
+      let cursor = try db.query("SELECT * FROM \(T.tableName) WHERE \(sqlWhereClause)", values)
+      let decoder = DatabaseDecoder(cursor: cursor)
       var models = [T]()
-      while resultSet.next() {
+      while cursor.step() {
         try models.append(T(from: decoder))
       }
       return models
     }
 
-    public func fetch<T>(_ type: T.Type, joining joinTable: String, on joinClause: String, allWhere sqlWhereClause: String? = nil, values: [Any]? = nil) throws  -> [T] where T : LCModel {
-      let sqlWhereClause = sqlWhereClause ?? "1=1"
-      let resultSet = try db.executeQuery("SELECT \(T.tableName).* FROM \(T.tableName) INNER JOIN \(joinTable) ON \(joinClause) WHERE \(sqlWhereClause)", values: values)
-      let decoder = DatabaseDecoder(resultSet: resultSet)
+    public func fetch<T>(_ type: T.Type, joining joinTable: String, on joinClause: String, allWhere sqlWhereClause: String? = nil, values: [SqliteRepresentable?] = []) throws  -> [T] where T : LCModel {
+      let sqlWhereClause = sqlWhereClause ?? "TRUE"
+      let cursor = try db.query("SELECT \(T.tableName).* FROM \(T.tableName) INNER JOIN \(joinTable) ON \(joinClause) WHERE \(sqlWhereClause)", values)
+      let decoder = DatabaseDecoder(cursor: cursor)
       var models = [T]()
-      while resultSet.next() {
+      while cursor.step() {
         try models.append(T(from: decoder))
       }
       return models
 
     }
       
-    public func executeUpdate(_ sql: String, values: [Any]? = nil) throws {
+    public func execute(_ sql: String, values: [SqliteRepresentable?] = []) throws {
       guard isEnabled else {
         fatalError("Do not use this proxy outside of the transaction closure")
       }
-      try db.executeUpdate(sql, values: values)
+      try db.execute(sql, values)
     }
     
-    public func executeQuery<T>(_ sql: String, values: [Any]? = nil, transformOutput: (FMResultSet) throws -> T) throws -> T {
+    public func query(_ sql: String, values: [SqliteRepresentable?] = []) throws -> Cursor {
       guard isEnabled else {
         fatalError("Do not use this proxy outside of the transaction closure")
       }
-      let rs = try db.executeQuery(sql, values: values)
-      defer { rs.close() }
-      return try transformOutput(rs)
-    }
-    
-    public func executeQuery(_ sql: String, values: [Any]? = nil) throws -> FMResultSet {
-      guard isEnabled else {
-        fatalError("Do not use this proxy outside of the transaction closure")
-      }
-      return try db.executeQuery(sql, values: values)
+      return try db.query(sql, values)
     }
     
     
     public func save<T>(_ model: T) throws where T : LCModel {
-      let (columnString, placeholders, values) = model.insertValues
-      try db.executeUpdate(
-        "INSERT OR REPLACE INTO \(T.tableName)(\(columnString)) VALUES (\(placeholders)) ",
-        values: values)
+      let encoder = DatabaseEncoder(tableName: T.tableName)
+      try model.encode(to: encoder)
+      let (insertStatement, values) = encoder.insertStatement
+      try db.execute(insertStatement, values)
     }
     
     public func delete<T>(_ model: T) throws where T : LCModel {
-      try db.executeUpdate("DELETE FROM \(T.tableName) WHERE id = ?", values: [model.id])
+      try db.execute("DELETE FROM \(T.tableName) WHERE id = ?", [model.id])
     }
     
     public func delete<T: LCModel>(_ type: T.Type, with id: T.ID) throws {
-      try db.executeUpdate("DELETE FROM \(T.tableName) WHERE id = ?", values: [id])
+      try db.execute("DELETE FROM \(T.tableName) WHERE id = ?", [id])
     }
     
-    public func delete<T: LCModel>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, values: [Any]? = nil) throws {
+    public func delete<T: LCModel>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, values: [SqliteRepresentable?] = []) throws {
       let sqlWhereClause = sqlWhereClause.flatMap { "WHERE \($0)" } ?? ""
-      try db.executeUpdate("DELETE FROM \(T.tableName) \(sqlWhereClause)", values: values)
+      try db.execute("DELETE FROM \(T.tableName) \(sqlWhereClause)", values)
     }
     
-    internal var db: FMDatabase
+    internal var db: Database
     internal var isEnabled = true
     
-    internal init(db: FMDatabase) {
+    internal init(db: Database) {
       self.db = db
     }
   }
@@ -96,10 +87,10 @@ extension LiteCrate {
 
 internal extension LiteCrate.TransactionProxy {
   func getCurrentSchemaVersion() throws -> Int64 {
-    let rs = try executeQuery("PRAGMA user_version", values: nil)
+    let cursor = try query("PRAGMA user_version")
     
-    if rs.next() {
-      let currentVersion = rs.longLongInt(forColumnIndex: 0)
+    if cursor.step() {
+      let currentVersion = cursor.int(for: 0)
       NSLog("DB at version %d", currentVersion)
       return currentVersion
     } else {
@@ -108,7 +99,7 @@ internal extension LiteCrate.TransactionProxy {
   }
   
   func setCurrentSchemaVersion(version: Int64) throws {
-    try executeUpdate(String(format: "PRAGMA user_version = %lld", version), values: [])
+    try execute(String(format: "PRAGMA user_version = %lld", version), values: [])
     // Being very careful to avoid injection vulnerability; ? is not valid here.
   }
 }

@@ -5,7 +5,7 @@
 //  Created by Ryan Purpura on 2/14/21.
 //
 
-import FMDB
+import LiteCrateCore
 import Foundation
 
 struct DatabaseDecoder: Decoder {
@@ -13,26 +13,42 @@ struct DatabaseDecoder: Decoder {
     var codingPath: [CodingKey] = []
     var allKeys: [Key] = []
 
-    var resultSet: FMResultSet
+    var cursor: Cursor
 
     func contains(_ key: Key) -> Bool {
-      return resultSet.columnIndex(forName: key.stringValue) >= 0
+      return cursor.columnToIndex[key.stringValue] != nil
     }
 
     func decodeNil(forKey key: Key) throws -> Bool {
-      resultSet.columnIsNull(key.stringValue)
+      guard let index = cursor.columnToIndex[key.stringValue] else {
+        throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
+      }
+      
+      return cursor.isNull(for: index)
     }
 
     func decode(_ type: Bool.Type, forKey key: Key) throws -> Bool {
-      return resultSet.bool(forColumn: key.stringValue)
+      guard let index = cursor.columnToIndex[key.stringValue] else {
+        throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
+      }
+      
+      return cursor.bool(for: index)
     }
 
     func decode(_ type: String.Type, forKey key: Key) throws -> String {
-      return resultSet.string(forColumn: key.stringValue) ?? ""
+      guard let index = cursor.columnToIndex[key.stringValue] else {
+        throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
+      }
+      
+      return cursor.string(for: index)
     }
 
     func decode(_ type: Double.Type, forKey key: Key) throws -> Double {
-      return resultSet.double(forColumn: key.stringValue)
+      guard let index = cursor.columnToIndex[key.stringValue] else {
+        throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
+      }
+
+      return cursor.double(for: index)
     }
 
     func decode(_ type: Float.Type, forKey key: Key) throws -> Float {
@@ -40,7 +56,7 @@ struct DatabaseDecoder: Decoder {
     }
 
     func decode(_ type: Int.Type, forKey key: Key) throws -> Int {
-      return resultSet.long(forColumn: key.stringValue)
+      fatalError()
     }
 
     func decode(_ type: Int8.Type, forKey key: Key) throws -> Int8 {
@@ -52,11 +68,14 @@ struct DatabaseDecoder: Decoder {
     }
 
     func decode(_ type: Int32.Type, forKey key: Key) throws -> Int32 {
-      return resultSet.int(forColumn: key.stringValue)
+      fatalError()
     }
 
     func decode(_ type: Int64.Type, forKey key: Key) throws -> Int64 {
-      return resultSet.longLongInt(forColumn: key.stringValue)
+      guard let index = cursor.columnToIndex[key.stringValue] else {
+        throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
+      }
+      return cursor.int(for: index)
     }
 
     func decode(_ type: UInt.Type, forKey key: Key) throws -> UInt {
@@ -78,30 +97,23 @@ struct DatabaseDecoder: Decoder {
     }
 
     func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64 {
-      return resultSet.unsignedLongLongInt(forColumn: key.stringValue)
+      fatalError()
     }
     
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
+      guard let index = cursor.columnToIndex[key.stringValue] else {
+        throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
+      }
+
       switch type {
       case is Date.Type, is Date?.Type:
-        return Date(timeIntervalSince1970: resultSet.double(forColumn: key.stringValue)) as! T
+        return cursor.date(for: index) as! T
       case is Data.Type, is Data?.Type:
-        return resultSet.data(forColumn: key.stringValue) as! T
+        return cursor.data(for: index) as! T
       case is UUID.Type, is UUID?.Type:
-        guard
-          let uuid = resultSet.string(forColumn: key.stringValue).flatMap(UUID.init(uuidString:))
-        else { fatalError() }
-        return uuid as! T
+        return cursor.uuid(for: index) as! T
       default:
-        let jsonDecoder = JSONDecoder()
-        jsonDecoder.keyDecodingStrategy = .useDefaultKeys
-        let jsonString = resultSet.string(forColumn: key.stringValue)
-        guard let data = jsonString.flatMap({ $0.data(using: .utf8) }),
-          let value = try? jsonDecoder.decode(T.self, from: data)
-        else {
-          fatalError()
-        }
-        return value
+        fatalError("Unsupported type")
       }
     }
 
@@ -128,11 +140,11 @@ struct DatabaseDecoder: Decoder {
 
   var codingPath: [CodingKey] = []
   var userInfo: [CodingUserInfoKey: Any] = [:]
-  let resultSet: FMResultSet
+  let cursor: Cursor
 
   func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key>
   where Key: CodingKey {
-    return KeyedDecodingContainer(KDC(resultSet: resultSet))
+    return KeyedDecodingContainer(KDC(cursor: cursor))
   }
 
   func unkeyedContainer() throws -> UnkeyedDecodingContainer {
