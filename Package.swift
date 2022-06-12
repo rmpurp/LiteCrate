@@ -22,7 +22,6 @@ let package = Package(
       name: "FMDB",
       url: "https://github.com/ccgus/fmdb",
       .upToNextMinor(from: "2.7.7"))
-
   ],
   targets: [
     // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -30,10 +29,25 @@ let package = Package(
     .target(
       name: "LiteCrate",
       dependencies: [
-        .byName(name: "FMDB")
+        .byName(name: "FMDB"),
+        .byName(name: "LiteCrateCore")
       ]),
+    .target(
+      name: "LiteCrateCore",
+      dependencies: [
+        .byName(name: "sqlite3")
+      ]),
+    .target(
+      name: "sqlite3",
+      dependencies: [],
+      publicHeadersPath: ".",
+      cSettings: [.unsafeFlags(["-Wno-everything"])]
+    ),
     .testTarget(
       name: "LiteCrateTests",
       dependencies: ["LiteCrate"]),
+    .testTarget(
+      name: "LiteCrateCoreTests",
+      dependencies: ["LiteCrateCore"]),
   ]
 )
