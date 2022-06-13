@@ -61,8 +61,24 @@ final class MigrationTests: XCTestCase {
     j.outputFormatting = [.prettyPrinted, .sortedKeys]
 
     j.userInfo[DatabasePayloadProxy.databaseUserInfoKey] = crate
-    try print(String(data: j.encode(DatabasePayloadProxy()), encoding: .utf8)!)
+    let data = try j.encode(DatabasePayloadProxy())
+    print(String(data: data, encoding: .utf8)!)
     
+    let d = JSONDecoder()
+    let crate2 = try LiteCrate(":memory:") {
+      MigrationStep {
+        CreateReplicatingTable(Employee(id: UUID(), name: ""))
+        CreateReplicatingTable(Boss(id: UUID(), rank: 0))
+      }
+    }
+    d.userInfo[DatabasePayloadProxy.databaseUserInfoKey] = crate2
+    _ = try d.decode(DatabasePayloadProxy.self, from: data)
+
+    try crate2.inTransaction { proxy in
+      print(try proxy.fetch(Boss.self))
+      print(try proxy.fetch(Employee.self))
+    }
+
     // TODO: write proper test
   }
 }

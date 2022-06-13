@@ -29,10 +29,17 @@ struct DatabasePayloadProxy: Codable {
   init() {}
   
   init(from decoder: Decoder) throws {
-//    guard let database = decoder.userInfo[DatabasePayloadProxy.databaseUserInfoKey] as? LiteCrate.TransactionProxy else {
-//      fatalError("Insert the database into the UserInfo dictionary.")
-//    }
-//    fatalError("TODO fill me in")
+    guard let database = decoder.userInfo[DatabasePayloadProxy.databaseUserInfoKey] as? LiteCrate else {
+      fatalError("Insert the database into the UserInfo dictionary.")
+    }
+    
+    let container = try decoder.container(keyedBy: TableNameCodingKey.self)
+    
+    try database.inTransaction { proxy in
+      for replicatingTable in database.replicatingTables {
+        try replicatingTable.populate(proxy: proxy, decodingContainer: container)
+      }
+    }
   }
   
   func encode(to encoder: Encoder) throws {
