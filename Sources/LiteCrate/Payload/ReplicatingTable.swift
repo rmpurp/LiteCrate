@@ -29,7 +29,8 @@ public class ReplicatingTable: Hashable {
   }
 }
 
-class ReplicatingTableImpl<T: LCModel>: ReplicatingTable {
+// TODO Change DatabaseCodable
+class ReplicatingTableImpl<T: DatabaseCodable>: ReplicatingTable {
   init(_ type: T.Type) {
     super.init(tableName: T.tableName)
   }

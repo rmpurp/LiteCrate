@@ -8,10 +8,7 @@
 import Foundation
 import LiteCrate
 
-struct Person: LCModel {
-//  var everSynced: Bool = false
-//  var isDirty: Bool = true
-  
+struct Person: DatabaseCodable {
   var id: UUID = UUID()
   var name: String
   var birthday: Date?

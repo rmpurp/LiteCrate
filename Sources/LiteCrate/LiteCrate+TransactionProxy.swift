@@ -9,16 +9,17 @@ import Foundation
 import LiteCrateCore
 
 extension LiteCrate {
+  
   public final class TransactionProxy {
-    public func createTable<T>(_ modelInstance: T) throws where T : LCModel {
+    public func createTable<T: DatabaseCodable>(_ modelInstance: T) throws {
       try self.execute(modelInstance.creationStatement)
     }
     
-    public func fetch<T>(_ type: T.Type, with id: T.ID) throws -> T? where T : LCModel {
-      return try fetch(type, allWhere: "id = ?", [id]).first
+    public func fetch<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type, with primaryKey: U) throws -> T? {
+      return try fetch(type, allWhere: "\(T.primaryKeyColumn) = ?", [primaryKey]).first
     }
     
-    public func fetch<T>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws  -> [T] where T : LCModel {
+    public func fetch<T: DatabaseCodable>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws -> [T] {
       let sqlWhereClause = sqlWhereClause ?? "TRUE"
       let cursor = try db.query("SELECT * FROM \(T.tableName) WHERE \(sqlWhereClause)", values)
       let decoder = DatabaseDecoder(cursor: cursor)
@@ -29,7 +30,7 @@ extension LiteCrate {
       return models
     }
 
-    public func fetch<T>(_ type: T.Type, joining joinTable: String, on joinClause: String, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws  -> [T] where T : LCModel {
+    public func fetch<T: DatabaseCodable>(_ type: T.Type, joining joinTable: String, on joinClause: String, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws -> [T] {
       let sqlWhereClause = sqlWhereClause ?? "TRUE"
       let cursor = try db.query("SELECT \(T.tableName).* FROM \(T.tableName) INNER JOIN \(joinTable) ON \(joinClause) WHERE \(sqlWhereClause)", values)
       let decoder = DatabaseDecoder(cursor: cursor)
@@ -38,7 +39,6 @@ extension LiteCrate {
         try models.append(T(from: decoder))
       }
       return models
-
     }
       
     public func execute(_ sql: String, _ values: [SqliteRepresentable?] = []) throws {
@@ -56,22 +56,18 @@ extension LiteCrate {
     }
     
     
-    public func save<T>(_ model: T) throws where T : LCModel {
+    public func save<T: DatabaseCodable>(_ model: T) throws {
       let encoder = DatabaseEncoder(tableName: T.tableName)
       try model.encode(to: encoder)
       let (insertStatement, values) = encoder.insertStatement
       try db.execute(insertStatement, values)
     }
     
-    public func delete<T>(_ model: T) throws where T : LCModel {
-      try db.execute("DELETE FROM \(T.tableName) WHERE id = ?", [model.id])
+    public func delete<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type, with primaryKey: U) throws {
+      try db.execute("DELETE FROM \(T.tableName) WHERE id = ?", [primaryKey])
     }
     
-    public func delete<T: LCModel>(_ type: T.Type, with id: T.ID) throws {
-      try db.execute("DELETE FROM \(T.tableName) WHERE id = ?", [id])
-    }
-    
-    public func delete<T: LCModel>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws {
+    public func delete<T: DatabaseCodable>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws {
       let sqlWhereClause = sqlWhereClause.flatMap { "WHERE \($0)" } ?? ""
       try db.execute("DELETE FROM \(T.tableName) \(sqlWhereClause)", values)
     }

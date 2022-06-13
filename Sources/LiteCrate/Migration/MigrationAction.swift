@@ -13,9 +13,10 @@ protocol MigrationAction {
 }
 
 extension MigrationAction {
+  func modifyReplicatingTables(_ replicatingTables: inout Set<ReplicatingTable>) {}
 }
 
-struct CreateReplicatingTable<T: LCModel>: MigrationAction {
+struct CreateReplicatingTable<T: DatabaseCodable>: MigrationAction {
   let creationStatement: String
   init(_ instance: T) {
     creationStatement = instance.creationStatement
@@ -31,7 +32,7 @@ struct CreateReplicatingTable<T: LCModel>: MigrationAction {
   }
 }
 
-struct CreateTable<T: LCModel>: MigrationAction {
+struct CreateTable<T: DatabaseCodable>: MigrationAction {
   let creationStatement: String
   init(_ instance: T) {
     creationStatement = instance.creationStatement
@@ -40,11 +41,6 @@ struct CreateTable<T: LCModel>: MigrationAction {
   func perform(in proxy: LiteCrate.TransactionProxy) throws {
     try proxy.execute(creationStatement)
   }
-  
-  func modifyReplicatingTables(_ replicatingTables: inout Set<ReplicatingTable>) {
-    print("I'm called.")
-  }
-
 }
 
 struct Execute: MigrationAction {
@@ -57,9 +53,4 @@ struct Execute: MigrationAction {
   func perform(in proxy: LiteCrate.TransactionProxy) throws {
     try proxy.execute(statement)
   }
-  
-  func modifyReplicatingTables(_ replicatingTables: inout Set<ReplicatingTable>) {
-    print("I'm called.")
-  }
-
 }
