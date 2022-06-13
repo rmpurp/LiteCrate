@@ -55,8 +55,29 @@ extension LiteCrate {
       return try db.query(sql, values)
     }
     
+    private func updateMetadata<T: ReplicatingModel>(_ model: T) throws {
+      let oldMetadata = try fetch(Metadata<T>.self,
+                               allWhere: "modelID = ?",
+                               [model.primaryKeyValue]).first
+      if var oldMetadata {
+        oldMetadata.sequenceLamport = lamport
+        oldMetadata.modelID = nil
+        try save(oldMetadata)
+      }
+  
+      let newMetadata = Metadata<T>(
+        version: UUID(),
+        modelID: model.primaryKeyValue,
+        lamport: lamport,
+        sequenceLamport: lamport)
+      try save(newMetadata)
+    }
     
     public func save<T: DatabaseCodable>(_ model: T) throws {
+      if let model = model as? any ReplicatingModel {
+        try updateMetadata(model)
+      }
+      
       let encoder = DatabaseEncoder(tableName: T.tableName)
       try model.encode(to: encoder)
       let (insertStatement, values) = encoder.insertStatement
@@ -75,8 +96,12 @@ extension LiteCrate {
     internal var db: Database
     internal var isEnabled = true
     
+    internal var lamport: Int64
+    
     internal init(db: Database) {
       self.db = db
+      self.lamport = 0 // TODO: Fetch from database.
+      // TODO: Then increment just before commit.
     }
   }
 }

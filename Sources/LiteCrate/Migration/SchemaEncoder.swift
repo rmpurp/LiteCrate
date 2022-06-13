@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import LiteCrateCore
 
 class SchemaEncoder: Encoder {
   enum SqliteType: String {
@@ -146,21 +147,29 @@ class SchemaEncoder: Encoder {
     
     func encodeIfPresent<T>(_ value: T?, forKey key: Key) throws where T : Encodable {
       if T.self == Date.self {
-        encoder.columns[key.stringValue] = .nullableReal
+        encoder.columns[key.stringValue] = .nullableInteger
       } else if T.self == Data.self {
         encoder.columns[key.stringValue] = .nullableBlob
-      } else {
+      } else if T.self == T.self {
         encoder.columns[key.stringValue] = .nullableText
       }
     }
     
+    mutating func encode<T: SqliteRepresentable>(sqliteRepresentable value: T, forKey key: Key) throws {
+      switch value.asSqliteType {
+      case let .blob(val): try encode(val, forKey: key)
+      case let .integer(val): try encode(val, forKey: key)
+      case let .real(val): try encode(val, forKey: key)
+      case let .text(val): try encode(val, forKey: key)
+      }
+    }
+    
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable {
-      if T.self == Date.self {
-        encoder.columns[key.stringValue] = .real
-      } else if T.self == Data.self {
-        encoder.columns[key.stringValue] = .blob
-      } else {
-        encoder.columns[key.stringValue] = .text
+      switch value {
+      case let value as SqliteRepresentable:
+        try encode(sqliteRepresentable: value, forKey: key)
+      default:
+        fatalError("Invalid type")
       }
     }
     

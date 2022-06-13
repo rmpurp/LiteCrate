@@ -14,7 +14,7 @@ public enum SqliteType {
   case blob(val: Data)
 }
 
-public protocol SqliteRepresentable {
+public protocol SqliteRepresentable: Codable {
   var asSqliteType: SqliteType { get }
 }
 

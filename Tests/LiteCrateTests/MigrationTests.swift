@@ -10,12 +10,12 @@ import XCTest
 
 @testable import LiteCrate
 
-struct Employee: DatabaseCodable {
+struct Employee: ReplicatingModel, Identifiable {
   var id: UUID
   var name: String
 }
 
-struct Boss: DatabaseCodable {
+struct Boss: ReplicatingModel, Identifiable {
   var id: UUID
   var rank: Int64
 }
