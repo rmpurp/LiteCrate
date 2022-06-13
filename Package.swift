@@ -38,9 +38,11 @@ let package = Package(
     ),
     .testTarget(
       name: "LiteCrateTests",
-      dependencies: ["LiteCrate"]),
+      dependencies: ["LiteCrate"]
+    ),
     .testTarget(
       name: "LiteCrateCoreTests",
-      dependencies: ["LiteCrateCore"]),
+      dependencies: ["LiteCrateCore"]
+    ),
   ]
 )

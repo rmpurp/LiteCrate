@@ -14,15 +14,28 @@ enum LiteCrateError: Error {
 
 public class LiteCrate {
   private var db: Database
+  var replicatingTables = Set<ReplicatingTable>()
   
-  public init(url: URL?, migration: (TransactionProxy, inout Int64) throws -> Void) throws {
-    db = try Database(url?.absoluteString ?? ":memory:")
-    
-    try inTransaction { db in
-      var currentVersion = try db.getCurrentSchemaVersion()
-      try migration(db, &currentVersion)
-      try db.setCurrentSchemaVersion(version: currentVersion)
+  public init(_ location: String, @MigrationBuilder migrations: () -> Migration) throws {
+    db = try Database(location)
+    try runMigrations(migration: migrations())
+  }
+  
+  private func runMigrations(migration: Migration) throws {
+    try inTransaction { proxy in
+      // interpret the current version as "Next migration to run"
+      var currentVersion = try proxy.getCurrentSchemaVersion()
+      for (i, migration) in migration.steps.enumerated() {
+        migration.resolve(replicatingTables: &replicatingTables)
+        if i < currentVersion { continue }
+        for action in migration.actions {
+          try action.perform(in: proxy)
+        }
+        currentVersion = Int64(i)
+      }
+      try proxy.setCurrentSchemaVersion(version: currentVersion)
     }
+    
   }
   
   public func close() {
@@ -49,55 +62,3 @@ public class LiteCrate {
     }
   }
 }
-
-//// MARK: - CRUD
-//extension LiteCrate {
-//  public func execute(_ sql: String, [SqliteRepresentable] = []) throws {
-//    try inTransaction { proxy in
-//      try proxy.execute(sql, values: values)
-//    }
-//  }
-//
-//  public func executeQuery(_ sql: String, values: [Any]? = nil) throws -> Cursor {
-//    try inTransaction { proxy in
-//      try proxy.executeQuery(sql, values: values)
-//    }
-//  }
-//
-//  public func save<T>(_ model: T) throws where T : LCModel {
-//    try inTransaction { proxy in
-//      try proxy.save(model)
-//    }
-//  }
-//
-//
-//  public func fetch<T>(_ type: T.Type, with id: T.ID) throws -> T? where T : LCModel {
-//    try inTransaction { proxy in
-//      try proxy.fetch(type, with: id)
-//    }
-//  }
-//
-//  public func fetch<T>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, values: [Any]? = nil) throws -> [T] where T : LCModel {
-//    try inTransaction { proxy in
-//      try proxy.fetch(type, allWhere: sqlWhereClause, values: values)
-//    }
-//  }
-//
-//  public func delete<T>(_ model: T) throws where T : LCModel {
-//    try inTransaction { proxy in
-//      try proxy.delete(model)
-//    }
-//  }
-//
-//  public func delete<T>(_ type: T.Type, with id: T.ID) throws where T : LCModel {
-//    try inTransaction { proxy in
-//      try proxy.delete(type, with: id)
-//    }
-//  }
-//
-//  public func delete<T>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, values: [Any]? = nil) throws where T : LCModel {
-//    try inTransaction { proxy in
-//      try proxy.delete(type, allWhere: sqlWhereClause, values: values)
-//    }
-//  }
-//}

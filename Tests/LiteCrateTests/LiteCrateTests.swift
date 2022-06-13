@@ -20,8 +20,10 @@ final class LiteCrateTests: XCTestCase {
   
   func testSaveAndFetch() throws {
     let person = Person(name: "Bob", dogID: UUID())
-    let crate = try LiteCrate(url: nil) { proxy, version in
-      try proxy.execute(person.creationStatement)
+    let crate = try LiteCrate(":memory:") {
+      MigrationStep {
+        CreateTable(Person(name: "", dogID: UUID()))
+      }
     }
     try crate.inTransaction { proxy in
       try proxy.save(person)
@@ -40,6 +42,5 @@ final class LiteCrateTests: XCTestCase {
       reached = true
     }
     XCTAssertTrue(reached)
-    
   }
 }
