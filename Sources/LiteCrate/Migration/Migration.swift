@@ -7,7 +7,6 @@
 
 import Foundation
 
-
 @resultBuilder
 struct MigrationStepBuilder {
   static func buildBlock(_ migrationActions: any MigrationAction...) -> [any MigrationAction] {
@@ -21,7 +20,7 @@ public struct MigrationStep {
   init(@MigrationStepBuilder _ actions: @escaping () -> [any MigrationAction]) {
     self.actions = actions()
   }
-  
+
   func resolve(replicatingTables: inout Set<ReplicatingTable>) {
     for action in actions {
       action.modifyReplicatingTables(&replicatingTables)
@@ -38,9 +37,8 @@ struct MigrationBuilder {
 
 public struct Migration {
   let steps: [MigrationStep]
-  
+
   init(steps: [MigrationStep]) {
     self.steps = steps
   }
 }
-

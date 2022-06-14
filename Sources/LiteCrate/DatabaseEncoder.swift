@@ -9,7 +9,7 @@ import Foundation
 import LiteCrateCore
 
 class DatabaseEncoder: Encoder {
-  
+
   init(tableName: String) {
     self.tableName = tableName
   }
@@ -18,15 +18,15 @@ class DatabaseEncoder: Encoder {
   var userInfo: [CodingUserInfoKey: Any] = [:]
   var columnToKey: [String: SqliteRepresentable?] = [:]
   var tableName: String
-  
+
   var insertStatement: (String, [SqliteRepresentable?]) {
     // If there is an error here, it will be caught and resolved during developement
-    
+
     let columns = [String](columnToKey.keys)
     let columnString = columns.joined(separator: ",")
     let placeholders = [String](repeating: "?", count: columnToKey.count).joined(separator: ",")
     let values = columns.map { columnToKey[$0]! }
-    
+
     let insertString = "INSERT OR REPLACE INTO \(tableName)(\(columnString)) VALUES (\(placeholders)) "
     return (insertString, values)
   }
@@ -103,7 +103,7 @@ class DatabaseEncoder: Encoder {
       encoder.columnToKey[key.stringValue] = Int64(value)
     }
 
-    mutating func encodeIfPresent<T>(_ value: T?, forKey key: Key) throws where T : Encodable {
+    mutating func encodeIfPresent<T>(_ value: T?, forKey key: Key) throws where T: Encodable {
       switch value {
       case .none:
         encoder.columnToKey[key.stringValue] = nil
@@ -113,8 +113,8 @@ class DatabaseEncoder: Encoder {
         fatalError("Incompatible type")
       }
     }
-    
-    mutating func encode<T>(_ value: T, forKey key: Key) throws where T : Encodable {
+
+    mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable {
       switch value {
       case let value as SqliteRepresentable:
         encoder.columnToKey[key.stringValue] = value
@@ -124,8 +124,7 @@ class DatabaseEncoder: Encoder {
     }
 
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key)
-      -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey
-    {
+      -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
       fatalError()
     }
 

@@ -20,7 +20,7 @@ extension Person: Hashable {
   static func == (lhs: Person, rhs: Person) -> Bool {
     return lhs.id == rhs.id
   }
-  
+
   func hash(into hasher: inout Hasher) {
     hasher.combine(id)
   }

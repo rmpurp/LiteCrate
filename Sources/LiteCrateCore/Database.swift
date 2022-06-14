@@ -14,14 +14,14 @@ private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.sel
 
 public enum DatabaseError: Error, CustomDebugStringConvertible {
   public var debugDescription: String {
-    switch (self) {
+    switch self {
     case .error(let msg): fallthrough
     case .abort(let msg): fallthrough
     case .unknown(let msg):
       return msg
     }
   }
-  
+
   case error(msg: String)
   case abort(msg: String)
   case unknown(msg: String)
@@ -30,7 +30,7 @@ public enum DatabaseError: Error, CustomDebugStringConvertible {
 public class Database {
   private let handle: SqliteDatabase
   private var closed: Bool = false
-  
+
   public init(_ path: String) throws {
     var ppDb: SqliteDatabase?
     let errorCode = sqlite3_open(path, &ppDb)
@@ -40,7 +40,7 @@ public class Database {
       throw getError()
     }
   }
-  
+
   func getError() -> DatabaseError {
     guard !closed else { fatalError("Operating on a closed database.") }
     let errorCode = sqlite3_errcode(handle)
@@ -51,7 +51,7 @@ public class Database {
     default: return DatabaseError.unknown(msg: errorMessage)
     }
   }
-  
+
   public func query(_ statement: String, _ parameters: [SqliteRepresentable?] = []) throws -> Cursor {
     guard !closed else { fatalError("Operating on a closed database.") }
     var ppStmt: SqliteStatement?
@@ -77,35 +77,35 @@ public class Database {
         sqlite3_bind_null(ppStmt, columnIndex)
       }
     }
-    
+
     let cursor = Cursor(database: self, statement: ppStmt)
     return cursor
   }
-  
+
   public func execute(_ statement: String, _ parameters: [SqliteRepresentable?] = []) throws {
     guard !closed else { fatalError("Operating on a closed database.") }
       let cursor = try query(statement, parameters)
       _ = try cursor.stepWithError()
   }
-  
+
   public func close() {
     guard !closed else { return }
     defer { closed = true }
     sqlite3_close_v2(handle)
   }
-  
+
   public func beginTransaction() throws {
     try execute("BEGIN DEFERRED")
   }
-  
+
   public func rollback() throws {
     try execute("ROLLBACK")
   }
-  
+
   public func commit() throws {
     try execute("COMMIT")
   }
-  
+
   deinit {
     close()
   }

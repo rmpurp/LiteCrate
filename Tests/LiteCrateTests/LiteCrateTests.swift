@@ -17,7 +17,7 @@ final class LiteCrateTests: XCTestCase {
     print(person.creationStatement)
     XCTAssertTrue(true)
   }
-  
+
   func testSaveAndFetch() throws {
     let person = Person(name: "Bob", dogID: UUID())
     let crate = try LiteCrate(":memory:") {
@@ -30,7 +30,7 @@ final class LiteCrateTests: XCTestCase {
     }
 
     var reached: Bool = false
-    
+
     try crate.inTransaction { proxy in
       guard let fetchedPerson = try proxy.fetch(Person.self, with: person.id) else {
         XCTFail()

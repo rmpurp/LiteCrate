@@ -25,12 +25,12 @@ struct CreateReplicatingTable<T: ReplicatingModel>: MigrationAction {
     let metadata = Metadata<T>(version: UUID(), modelID: UUID(), lamport: 0, sequenceLamport: 0)
     metadataCreationStatement = metadata.creationStatement
   }
-  
+
   func perform(in proxy: LiteCrate.TransactionProxy) throws {
     try proxy.execute(metadataCreationStatement)
     try proxy.execute(creationStatement)
   }
-  
+
   func modifyReplicatingTables(_ replicatingTables: inout Set<ReplicatingTable>) {
     replicatingTables.insert(ReplicatingTableImpl(T.self))
   }
@@ -41,7 +41,7 @@ struct CreateTable<T: DatabaseCodable>: MigrationAction {
   init(_ instance: T) {
     creationStatement = instance.creationStatement
   }
-  
+
   func perform(in proxy: LiteCrate.TransactionProxy) throws {
     try proxy.execute(creationStatement)
   }
@@ -49,11 +49,11 @@ struct CreateTable<T: DatabaseCodable>: MigrationAction {
 
 struct Execute: MigrationAction {
   let statement: String
-  
+
   init(_ statement: String) {
     self.statement = statement
   }
-  
+
   func perform(in proxy: LiteCrate.TransactionProxy) throws {
     try proxy.execute(statement)
   }

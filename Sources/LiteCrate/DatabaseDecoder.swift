@@ -23,7 +23,7 @@ struct DatabaseDecoder: Decoder {
       guard let index = cursor.columnToIndex[key.stringValue] else {
         throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
       }
-      
+
       return cursor.isNull(for: index)
     }
 
@@ -31,7 +31,7 @@ struct DatabaseDecoder: Decoder {
       guard let index = cursor.columnToIndex[key.stringValue] else {
         throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
       }
-      
+
       return cursor.bool(for: index)
     }
 
@@ -39,7 +39,7 @@ struct DatabaseDecoder: Decoder {
       guard let index = cursor.columnToIndex[key.stringValue] else {
         throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
       }
-      
+
       return cursor.string(for: index)
     }
 
@@ -99,7 +99,7 @@ struct DatabaseDecoder: Decoder {
     func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64 {
       fatalError()
     }
-    
+
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
       guard let index = cursor.columnToIndex[key.stringValue] else {
         throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
@@ -118,8 +118,7 @@ struct DatabaseDecoder: Decoder {
     }
 
     func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws
-      -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey
-    {
+      -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
       fatalError()
     }
 

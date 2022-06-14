@@ -15,15 +15,15 @@ public class Cursor {
   private let statement: SqliteStatement
   private var done: Bool = false
   private var closed: Bool = false
-  private var _columnToIndex: [String: Int32]? = nil
-  
+  private var _columnToIndex: [String: Int32]?
+
   public var columnToIndex: [String: Int32] {
     guard !closed else { fatalError("Operating on a closed statement.") }
 
     if let _columnToIndex {
       return _columnToIndex
     }
-    
+
     let columnCount = sqlite3_column_count(statement)
     guard columnCount > 0 else { return [:] }
 
@@ -35,14 +35,14 @@ public class Cursor {
     _columnToIndex = columnToIndexDictionary
     return columnToIndexDictionary
   }
-  
-  private var stepError: DatabaseError? = nil
-  
+
+  private var stepError: DatabaseError?
+
   init(database: Database, statement: SqliteStatement) {
     self.database = database
     self.statement = statement
   }
-  
+
   public func step() -> Bool {
     do {
       return try stepWithError()
@@ -50,7 +50,7 @@ public class Cursor {
       return false
     }
   }
-  
+
   public func stepWithError() throws -> Bool {
     guard !closed else { fatalError("Operating on a closed statement.") }
     let resultCode = sqlite3_step(statement)
@@ -66,49 +66,49 @@ public class Cursor {
       throw database.getError()
     }
   }
-  
+
   public func string(for index: Int32) -> String {
     guard !closed else { fatalError("Operating on a closed statement.") }
     return String(cString: sqlite3_column_text(statement, index))
   }
-  
+
   public func int(for index: Int32) -> Int64 {
     guard !closed else { fatalError("Operating on a closed statement.") }
     return sqlite3_column_int64(statement, index)
   }
-  
+
   public func double(for index: Int32) -> Double {
     guard !closed else { fatalError("Operating on a closed statement.") }
     return sqlite3_column_double(statement, index)
   }
-  
+
   public func bool(for index: Int32) -> Bool {
     return int(for: index) == 0 ? false : true
   }
-  
+
   public func data(for index: Int32) -> Data {
     guard !closed else { fatalError("Operating on a closed statement.") }
     let bytes = sqlite3_column_blob(statement, index)!
     let count = sqlite3_column_bytes(statement, index)
     return Data(bytes: bytes, count: Int(count))
   }
-  
+
   public func date(for index: Int32) -> Date {
     let timeInterval = TimeInterval(int(for: index))
     return Date(timeIntervalSince1970: timeInterval)
   }
-  
+
   public func uuid(for index: Int32) -> UUID {
     let uuidString = string(for: index)
     guard let uuid = UUID(uuidString: uuidString) else { fatalError("Invalid UUID string: \(uuidString)") }
     return uuid
   }
-  
+
   public func isNull(for index: Int32) -> Bool {
     guard !closed else { fatalError("Operating on a closed statement.") }
     return sqlite3_column_text(statement, index) == nil
   }
-  
+
   /// Close this statement.
   /// It is OK to call this multiple times.
   /// This will be automatically called when this object is deinited.
@@ -117,7 +117,7 @@ public class Cursor {
     defer { closed = true }
     sqlite3_finalize(statement)
   }
-  
+
   deinit {
     close()
   }

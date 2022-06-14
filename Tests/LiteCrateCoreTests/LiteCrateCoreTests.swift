@@ -22,6 +22,6 @@ final class LiteCrateCoreTests: XCTestCase {
     XCTAssertLessThanOrEqual(abs(cursor.date(for: 5).timeIntervalSince(testDate)), 1.0)
     XCTAssertEqual(cursor.uuid(for: 6), testUUID)
     XCTAssertTrue(cursor.bool(for: 7))
-    XCTAssertFalse(cursor.bool(for: 8))    
+    XCTAssertFalse(cursor.bool(for: 8))
   }
 }
