@@ -8,37 +8,37 @@
 import Foundation
 
 @resultBuilder
-struct MigrationStepBuilder {
+public struct MigrationStepBuilder {
   static func buildBlock(_ migrationActions: any MigrationAction...) -> [any MigrationAction] {
     migrationActions
   }
 }
 
-public struct MigrationStep {
-  let actions: [any MigrationAction]
+public protocol MigrationStep {
+  var asGroup: MigrationGroup { get }
+}
+
+public struct MigrationGroup: MigrationStep {
+  public let actions: [any MigrationAction]
 
   init(@MigrationStepBuilder _ actions: @escaping () -> [any MigrationAction]) {
     self.actions = actions()
   }
-
-  func resolve(replicatingTables: inout Set<ReplicatingTable>) {
-    for action in actions {
-      action.modifyReplicatingTables(&replicatingTables)
-    }
-  }
+  
+  public var asGroup: MigrationGroup { return self }
 }
 
 @resultBuilder
-struct MigrationBuilder {
+public struct MigrationBuilder {
   static func buildBlock(_ migrationSteps: MigrationStep...) -> Migration {
-    Migration(steps: migrationSteps)
+    Migration(steps: migrationSteps.map(\.asGroup))
   }
 }
 
 public struct Migration {
-  let steps: [MigrationStep]
+  let steps: [MigrationGroup]
 
-  init(steps: [MigrationStep]) {
+  init(steps: [MigrationGroup]) {
     self.steps = steps
   }
 }
