@@ -54,28 +54,32 @@ extension LiteCrate {
       }
       return try db.query(sql, values)
     }
-
-    private func updateMetadata<T: ReplicatingModel>(_ model: T) throws {
-      let oldMetadata = try fetch(Metadata<T>.self,
-                               allWhere: "modelID = ?",
-                               [model.primaryKeyValue]).first
-      if var oldMetadata {
-        oldMetadata.sequenceLamport = lamport
-        oldMetadata.modelID = nil
-        try save(oldMetadata)
+    
+    func beginTransaction() throws {
+      try db.beginTransaction()
+      try fetchTime()
+    }
+    
+    private func updateDot<T: ReplicatingModel>(_ model: T) throws {
+      needToIncrementTime = true
+      
+      if var dot = try fetch(Dot<T>.self,
+                               allWhere: "modelID = ? ORDER BY timeCreated DESC LIMIT 1",
+                             [model.primaryKeyValue]).first {
+        dot.timeLastModified = time
+        dot.lastModifier = node
+        dot.timeLastWitnessed = time
+        dot.witness = node
+        try save(dot)
+      } else {
+        let dot = Dot<T>(modelID: model.primaryKeyValue, time: time, creator: node)
+        try save(dot)
       }
-
-      let newMetadata = Metadata<T>(
-        version: UUID(),
-        modelID: model.primaryKeyValue,
-        lamport: lamport,
-        sequenceLamport: lamport)
-      try save(newMetadata)
     }
 
     public func save<T: DatabaseCodable>(_ model: T) throws {
       if let model = model as? any ReplicatingModel {
-        try updateMetadata(model)
+        try updateDot(model)
       }
 
       let encoder = DatabaseEncoder(tableName: T.tableName)
@@ -96,12 +100,31 @@ extension LiteCrate {
     internal var db: Database
     internal var isEnabled = true
 
-    internal var lamport: Int64
+    private var time: Int64!
+    private var needToIncrementTime = false
+    
+    private func fetchTime() throws {
+      var cursor = try query("SELECT time FROM Node WHERE id = ?", [node])
+      if cursor.step() {
+        time = cursor.int(for: 0)
+      }
+      
+      cursor = try query("SELECT COALESCE(max(time), 0) FROM Node")
+      guard cursor.step() else { fatalError() } // Should be impossible. Though TODO: change this to a throw LOL
+      time = cursor.int(for: 0)
+    }
+    
+    func incrementTimeIfNeeded() throws  {
+      if needToIncrementTime {
+        try execute("INSERT OR REPLACE INTO Node(id, time) VALUES (?, ?)", [node, time + 1])
+      }
+    }
+    
+    internal var node: UUID
 
-    internal init(db: Database) {
+    internal init(db: Database, node: UUID) {
       self.db = db
-      self.lamport = 0 // TODO: Fetch from database.
-      // TODO: Then increment just before commit.
+      self.node = node
     }
   }
 }

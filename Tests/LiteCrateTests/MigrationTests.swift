@@ -22,7 +22,7 @@ struct Boss: ReplicatingModel, Identifiable {
 
 final class MigrationTests: XCTestCase {
   func testMigration() throws {
-    let crate = try LiteCrate(":memory:") {
+    let crate = try LiteCrate(":memory:", nodeID: UUID()) {
       MigrationStep {
         CreateReplicatingTable(Employee(id: UUID(), name: ""))
         CreateReplicatingTable(Boss(id: UUID(), rank: 0))
@@ -45,7 +45,7 @@ final class MigrationTests: XCTestCase {
   }
 
   func testPayload() throws {
-    let crate = try LiteCrate(":memory:") {
+    let crate = try LiteCrate(":memory:", nodeID: UUID()) {
       MigrationStep {
         CreateReplicatingTable(Employee(id: UUID(), name: ""))
         CreateReplicatingTable(Boss(id: UUID(), rank: 0))
@@ -64,7 +64,7 @@ final class MigrationTests: XCTestCase {
     print(String(data: data, encoding: .utf8)!)
 
     let d = JSONDecoder()
-    let crate2 = try LiteCrate(":memory:") {
+    let crate2 = try LiteCrate(":memory:", nodeID:  UUID()) {
       MigrationStep {
         CreateReplicatingTable(Employee(id: UUID(), name: ""))
         CreateReplicatingTable(Boss(id: UUID(), rank: 0))

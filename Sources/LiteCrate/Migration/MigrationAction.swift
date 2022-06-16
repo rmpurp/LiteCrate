@@ -18,16 +18,16 @@ extension MigrationAction {
 
 struct CreateReplicatingTable<T: ReplicatingModel>: MigrationAction {
   let creationStatement: String
-  let metadataCreationStatement: String
+  let dotCreationStatement: String
 
   init(_ instance: T) {
     creationStatement = instance.creationStatement
-    let metadata = Metadata<T>(version: UUID(), modelID: UUID(), lamport: 0, sequenceLamport: 0)
-    metadataCreationStatement = metadata.creationStatement
+    let dot = Dot<T>(modelID: UUID(), time: 0, creator: UUID())
+    dotCreationStatement = dot.creationStatement
   }
 
   func perform(in proxy: LiteCrate.TransactionProxy) throws {
-    try proxy.execute(metadataCreationStatement)
+    try proxy.execute(dotCreationStatement)
     try proxy.execute(creationStatement)
   }
 
