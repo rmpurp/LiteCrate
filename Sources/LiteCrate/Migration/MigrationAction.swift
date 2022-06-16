@@ -7,16 +7,16 @@
 
 import Foundation
 
-protocol MigrationAction {
+public protocol MigrationAction {
   func perform(in proxy: LiteCrate.TransactionProxy) throws
   func modifyReplicatingTables(_ replicatingTables: inout Set<ReplicatingTable>)
 }
 
-extension MigrationAction {
+public extension MigrationAction {
   func modifyReplicatingTables(_ replicatingTables: inout Set<ReplicatingTable>) {}
 }
 
-struct CreateReplicatingTable<T: ReplicatingModel>: MigrationAction {
+public struct CreateReplicatingTable<T: ReplicatingModel>: MigrationAction {
   let creationStatement: String
   let dotCreationStatement: String
 
@@ -36,7 +36,7 @@ struct CreateReplicatingTable<T: ReplicatingModel>: MigrationAction {
   }
 }
 
-struct CreateTable<T: DatabaseCodable>: MigrationAction {
+public struct CreateTable<T: DatabaseCodable>: MigrationAction {
   let creationStatement: String
   init(_ instance: T) {
     creationStatement = instance.creationStatement
@@ -47,7 +47,7 @@ struct CreateTable<T: DatabaseCodable>: MigrationAction {
   }
 }
 
-struct Execute: MigrationAction {
+public struct Execute: MigrationAction {
   let statement: String
 
   init(_ statement: String) {
