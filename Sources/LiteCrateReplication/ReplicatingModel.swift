@@ -6,6 +6,6 @@
 //
 
 import Foundation
+import LiteCrate
 
-public protocol ReplicatingModel: DatabaseCodable<UUID> {
-}
+public protocol ReplicatingModel: DatabaseCodable<UUID> {}

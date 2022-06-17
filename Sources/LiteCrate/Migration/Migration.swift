@@ -20,12 +20,6 @@ public struct MigrationStep {
   init(@MigrationStepBuilder _ actions: @escaping () -> [any MigrationAction]) {
     self.actions = actions()
   }
-
-  func resolve(replicatingTables: inout Set<ReplicatingTable>) {
-    for action in actions {
-      action.modifyReplicatingTables(&replicatingTables)
-    }
-  }
 }
 
 @resultBuilder

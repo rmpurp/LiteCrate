@@ -23,7 +23,7 @@ public extension DatabaseCodable {
 
   var tableName: String { Self.tableName }
 
-  internal var creationStatement: String {
+  var creationStatement: String {
     let encoder = SchemaEncoder()
     try! self.encode(to: encoder)
 

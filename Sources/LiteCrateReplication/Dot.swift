@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import LiteCrateCore
+import LiteCrate
 
 struct Dot<Model: ReplicatingModel>: DatabaseCodable, Identifiable {
   var id: UUID
@@ -15,8 +15,8 @@ struct Dot<Model: ReplicatingModel>: DatabaseCodable, Identifiable {
   var timeCreated: Int64
   var creator: UUID
   
-  var timeLastModified: Int64
-  var lastModifier: UUID
+  var timeLastModified: Int64?
+  var lastModifier: UUID?
   
   var timeLastWitnessed: Int64
   var witness: UUID

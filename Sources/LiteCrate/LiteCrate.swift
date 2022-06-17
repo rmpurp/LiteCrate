@@ -14,32 +14,36 @@ enum LiteCrateError: Error {
 
 public class LiteCrate {
   private var db: Database
-  var replicatingTables = Set<ReplicatingTable>()
+  private var delegate: (any DatabaseDelegate)?
   var nodeID: UUID
   
-  public init(_ location: String, nodeID: UUID, @MigrationBuilder migrations: () -> Migration) throws {
+  public init(_ location: String, delegate: (any DatabaseDelegate)? = nil, nodeID: UUID, @MigrationBuilder migrations: () -> Migration) throws {
     self.db = try Database(location)
+    self.delegate = delegate
     self.nodeID = nodeID
     try runMigrations(migration: migrations())
   }
   
   private func runMigrations(migration: Migration) throws {
-    let proxy = TransactionProxy(db: db, node: nodeID)
+    let proxy = TransactionProxy(db: db, delegate: delegate, node: nodeID)
+
+    // Don't call delegate transaction method.
     try proxy.db.beginTransaction()
     
     // interpret the current version as "Next migration to run"
     var currentVersion = try proxy.getCurrentSchemaVersion()
     if currentVersion == 0 {
-      try Execute("CREATE TABLE Node(id TEXT PRIMARY KEY, time INT NOT NULL)").perform(in: proxy)
+      try delegate?.migrationDidInitialize(proxy)
       currentVersion = 1
     }
     
     for (i, migration) in migration.steps.enumerated() {
       let step = i + 1
-      migration.resolve(replicatingTables: &replicatingTables)
       if step < currentVersion { continue }
       for action in migration.actions {
+        try delegate?.migrationActionWillRun(action)
         try action.perform(in: proxy)
+        try delegate?.migrationActionDidRun(action)
       }
       currentVersion = Int64(step)
     }
@@ -54,15 +58,15 @@ public class LiteCrate {
   
   @discardableResult
   public func inTransaction<T>(block: (TransactionProxy) throws -> T) throws -> T {
-    let proxy = TransactionProxy(db: db, node: nodeID)
+    let proxy = TransactionProxy(db: db, delegate: delegate, node: nodeID)
     
     defer { proxy.isEnabled = false }
     
     do {
-      try proxy.beginTransaction()
-      
+      try proxy.db.beginTransaction()
+      try delegate?.transactionDidBegin(proxy)
       let returnValue = try block(proxy)
-      try proxy.incrementTimeIfNeeded()
+      try delegate?.transactionWillCommit(proxy)
       try proxy.db.commit()
       proxy.isEnabled = false
       return returnValue

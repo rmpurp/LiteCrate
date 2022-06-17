@@ -9,12 +9,22 @@ import Foundation
 import LiteCrateCore
 
 public protocol DatabaseDelegate {
-  func transactionDidBegin(_ proxy: Database.TransactionProxy)
-  func transactionWillCommit(_ proxy: Database.TransactionProxy)
-  func migrationActionWillRun(_ action: MigrationAction)
+  func transactionDidBegin(_ proxy: LiteCrate.TransactionProxy) throws
+  func transactionWillCommit(_ proxy: LiteCrate.TransactionProxy) throws
+  func migrationDidInitialize(_ proxy: LiteCrate.TransactionProxy) throws
+  func migrationActionWillRun<A: MigrationAction>(_ action: A) throws
+  func model<T: DatabaseCodable>(_ model: T, willSaveIn proxy: LiteCrate.TransactionProxy) throws
+  func model<T: DatabaseCodable>(_ model: T, willDeleteIn proxy: LiteCrate.TransactionProxy) throws
+  func migrationActionDidRun<A: MigrationAction>(_ action: A) throws
 }
 
-extension DatabaseDelegate {
-  func transactionDidBegin(_ proxy: Database.TransactionProxy) { }
-  func transactionWillCommit(_ proxy: Database.TransactionProxy) { }
+public extension DatabaseDelegate {
+  func transactionDidBegin(_ proxy: LiteCrate.TransactionProxy) throws {}
+  func transactionWillCommit(_ proxy: LiteCrate.TransactionProxy) throws {}
+  func migrationDidInitialize(_ proxy: LiteCrate.TransactionProxy) throws {}
+  func migrationActionWillRun<A: MigrationAction>(_ action: A) throws {}
+  func model<T: DatabaseCodable>(_ model: T, willSaveIn proxy: LiteCrate.TransactionProxy) throws {}
+  func model<T: DatabaseCodable>(_ model: T, willDeleteIn proxy: LiteCrate.TransactionProxy) throws {}
+  func migrationActionDidRun<A: MigrationAction>(_ action: A) throws {}
 }
+

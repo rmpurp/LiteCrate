@@ -55,33 +55,7 @@ extension LiteCrate {
       return try db.query(sql, values)
     }
     
-    func beginTransaction() throws {
-      try db.beginTransaction()
-      try fetchTime()
-    }
-    
-    private func updateDot<T: ReplicatingModel>(_ model: T) throws {
-      needToIncrementTime = true
-      
-      if var dot = try fetch(Dot<T>.self,
-                               allWhere: "modelID = ? ORDER BY timeCreated DESC LIMIT 1",
-                             [model.primaryKeyValue]).first {
-        dot.timeLastModified = time
-        dot.lastModifier = node
-        dot.timeLastWitnessed = time
-        dot.witness = node
-        try save(dot)
-      } else {
-        let dot = Dot<T>(modelID: model.primaryKeyValue, time: time, creator: node)
-        try save(dot)
-      }
-    }
-
     public func save<T: DatabaseCodable>(_ model: T) throws {
-      if let model = model as? any ReplicatingModel {
-        try updateDot(model)
-      }
-
       let encoder = DatabaseEncoder(tableName: T.tableName)
       try model.encode(to: encoder)
       let (insertStatement, values) = encoder.insertStatement
@@ -121,9 +95,10 @@ extension LiteCrate {
     }
     
     internal var node: UUID
-
-    internal init(db: Database, node: UUID) {
+    private var delegate: (any DatabaseDelegate)?
+    internal init(db: Database, delegate: (any DatabaseDelegate)?, node: UUID) {
       self.db = db
+      self.delegate = delegate
       self.node = node
     }
   }

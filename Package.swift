@@ -17,8 +17,8 @@ let package = Package(
       name: "LiteCrate",
       targets: ["LiteCrate"]),
     .library(
-      name: "LiteCrateCRDT",
-      targets: ["LiteCrate"])
+      name: "LiteCrateReplication",
+      targets: ["LiteCrateReplication", "LiteCrate"])
   ],
   targets: [
     // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -27,6 +27,11 @@ let package = Package(
       name: "LiteCrate",
       dependencies: [
         .byName(name: "LiteCrateCore")
+      ]),
+    .target(
+      name: "LiteCrateReplication",
+      dependencies: [
+        .byName(name: "LiteCrate")
       ]),
     .target(
       name: "LiteCrateCore",
@@ -46,6 +51,10 @@ let package = Package(
     .testTarget(
       name: "LiteCrateCoreTests",
       dependencies: ["LiteCrateCore"]
+    ),
+    .testTarget(
+      name: "LiteCrateReplicationTests",
+      dependencies: ["LiteCrateReplication"]
     )
   ]
 )
