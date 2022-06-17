@@ -95,8 +95,8 @@ extension LiteCrate {
     }
     
     internal var node: UUID
-    private var delegate: (any DatabaseDelegate)?
-    internal init(db: Database, delegate: (any DatabaseDelegate)?, node: UUID) {
+    private var delegate: (any LiteCrateDelegate)?
+    internal init(db: Database, delegate: (any LiteCrateDelegate)?, node: UUID) {
       self.db = db
       self.delegate = delegate
       self.node = node

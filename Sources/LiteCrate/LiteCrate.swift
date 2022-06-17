@@ -14,10 +14,10 @@ enum LiteCrateError: Error {
 
 public class LiteCrate {
   private var db: Database
-  private var delegate: (any DatabaseDelegate)?
+  private var delegate: (any LiteCrateDelegate)?
   var nodeID: UUID
   
-  public init(_ location: String, delegate: (any DatabaseDelegate)? = nil, nodeID: UUID, @MigrationBuilder migrations: () -> Migration) throws {
+  public init(_ location: String, delegate: (any LiteCrateDelegate)? = nil, nodeID: UUID, @MigrationBuilder migrations: () -> Migration) throws {
     self.db = try Database(location)
     self.delegate = delegate
     self.nodeID = nodeID

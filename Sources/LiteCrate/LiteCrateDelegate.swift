@@ -8,7 +8,7 @@
 import Foundation
 import LiteCrateCore
 
-public protocol DatabaseDelegate {
+public protocol LiteCrateDelegate {
   func transactionDidBegin(_ proxy: LiteCrate.TransactionProxy) throws
   func transactionWillCommit(_ proxy: LiteCrate.TransactionProxy) throws
   func migrationDidInitialize(_ proxy: LiteCrate.TransactionProxy) throws
@@ -18,7 +18,7 @@ public protocol DatabaseDelegate {
   func migrationActionDidRun<A: MigrationAction>(_ action: A) throws
 }
 
-public extension DatabaseDelegate {
+public extension LiteCrateDelegate {
   func transactionDidBegin(_ proxy: LiteCrate.TransactionProxy) throws {}
   func transactionWillCommit(_ proxy: LiteCrate.TransactionProxy) throws {}
   func migrationDidInitialize(_ proxy: LiteCrate.TransactionProxy) throws {}

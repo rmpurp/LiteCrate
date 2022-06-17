@@ -8,7 +8,7 @@
 import Foundation
 import LiteCrate
 
-class ReplicationDelegate: DatabaseDelegate {
+class ReplicationDelegate: LiteCrateDelegate {
   private var needToIncrementTime = false
   var replicatingTables = Set<ReplicatingTable>()
   var nodeID: UUID
