@@ -56,14 +56,22 @@ extension LiteCrate {
     }
     
     public func save<T: DatabaseCodable>(_ model: T) throws {
+      try delegate?.proxy(self, willSave: model)
       let encoder = DatabaseEncoder(tableName: T.tableName)
       try model.encode(to: encoder)
       let (insertStatement, values) = encoder.insertStatement
       try db.execute(insertStatement, values)
     }
+    
+    public func delete<T: DatabaseCodable>(_ model: T) throws {
+      try delegate?.proxy(self, willDelete: model)
+      try db.execute("DELETE FROM \(T.tableName) WHERE \(T.primaryKeyColumn) = ?", [model.primaryKeyValue])
+    }
+
 
     public func delete<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type, with primaryKey: U) throws {
-      try db.execute("DELETE FROM \(T.tableName) WHERE id = ?", [primaryKey])
+      guard let model = try fetch(T.self, with: primaryKey) else { return }
+      try delete(model)
     }
 
     public func delete<T: DatabaseCodable>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws {

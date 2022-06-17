@@ -13,8 +13,8 @@ public protocol LiteCrateDelegate {
   func transactionWillCommit(_ proxy: LiteCrate.TransactionProxy) throws
   func migrationDidInitialize(_ proxy: LiteCrate.TransactionProxy) throws
   func migrationActionWillRun<A: MigrationAction>(_ action: A) throws
-  func model<T: DatabaseCodable>(_ model: T, willSaveIn proxy: LiteCrate.TransactionProxy) throws
-  func model<T: DatabaseCodable>(_ model: T, willDeleteIn proxy: LiteCrate.TransactionProxy) throws
+  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws
+  func proxy<T>(_ proxy: LiteCrate.TransactionProxy, willDelete model: T) throws
   func migrationActionDidRun<A: MigrationAction>(_ action: A) throws
 }
 
@@ -23,8 +23,7 @@ public extension LiteCrateDelegate {
   func transactionWillCommit(_ proxy: LiteCrate.TransactionProxy) throws {}
   func migrationDidInitialize(_ proxy: LiteCrate.TransactionProxy) throws {}
   func migrationActionWillRun<A: MigrationAction>(_ action: A) throws {}
-  func model<T: DatabaseCodable>(_ model: T, willSaveIn proxy: LiteCrate.TransactionProxy) throws {}
-  func model<T: DatabaseCodable>(_ model: T, willDeleteIn proxy: LiteCrate.TransactionProxy) throws {}
+  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws {}
+  func proxy<T>(_ proxy: LiteCrate.TransactionProxy, willDelete model: T) throws {}
   func migrationActionDidRun<A: MigrationAction>(_ action: A) throws {}
 }
-

@@ -7,6 +7,7 @@
 
 import Foundation
 import LiteCrate
+import LiteCrateCore
 
 class ReplicationDelegate: LiteCrateDelegate {
   private var needToIncrementTime = false
@@ -40,13 +41,13 @@ class ReplicationDelegate: LiteCrateDelegate {
     
   }
   
-  func model<T>(_ model: T, willSaveIn proxy: LiteCrate.TransactionProxy) throws where T : DatabaseCodable {
+  func proxy<T>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws where T : DatabaseCodable {
     if let model = model as? (any ReplicatingModel) {
       needToIncrementTime = true
       try updateDotForSave(model, in: proxy)
     }
   }
-  
+    
   private func updateDotForSave<T: ReplicatingModel>(_ model: T, in proxy: LiteCrate.TransactionProxy) throws {
     if var dot = try proxy.fetch(Dot<T>.self,
                                  allWhere: "modelID = ? AND timeLastModified IS NOT NULL",
@@ -63,8 +64,13 @@ class ReplicationDelegate: LiteCrateDelegate {
     }
   }
   
+  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willDelete model: T) throws {
+    if let model = model as? (any ReplicatingModel) {
+      try updateDot(in: proxy, deleting: model)
+    }
+  }
   
-  private func updateDotForDelete<T: ReplicatingModel>(_ model: T, in proxy: LiteCrate.TransactionProxy) throws {
+  private func updateDot<T: ReplicatingModel>(in proxy: LiteCrate.TransactionProxy, deleting model: T) throws {
     needToIncrementTime = true
     if var dot = try proxy.fetch(Dot<T>.self,
                                  allWhere: "modelID = ? ORDER BY timeCreated DESC LIMIT 1",
@@ -79,11 +85,4 @@ class ReplicationDelegate: LiteCrateDelegate {
       try proxy.save(dot)
     }
   }
-  
-  func model<T>(_ model: T, willDeleteIn proxy: LiteCrate.TransactionProxy) throws where T : DatabaseCodable {
-    if let model = model as? any ReplicatingModel {
-      try updateDotForDelete(model, in: proxy)
-    }
-  }
-  
 }

@@ -15,7 +15,7 @@ let package = Package(
     // Products define the executables and libraries a package produces, and make them visible to other packages.
     .library(
       name: "LiteCrate",
-      targets: ["LiteCrate"]),
+      targets: ["LiteCrate", "LiteCrateCore"]),
     .library(
       name: "LiteCrateReplication",
       targets: ["LiteCrateReplication", "LiteCrate"])
