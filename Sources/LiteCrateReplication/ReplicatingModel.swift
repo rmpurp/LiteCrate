@@ -8,4 +8,6 @@
 import Foundation
 import LiteCrate
 
-public protocol ReplicatingModel: DatabaseCodable<UUID> {}
+public protocol ReplicatingModel: DatabaseCodable<UUID> {
+  var dot: Dot { get set }
+}

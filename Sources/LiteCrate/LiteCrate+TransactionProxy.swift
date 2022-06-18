@@ -56,7 +56,7 @@ extension LiteCrate {
     }
     
     public func save<T: DatabaseCodable>(_ model: T) throws {
-      try delegate?.proxy(self, willSave: model)
+      let model = try delegate?.proxy(self, willSave: model) ?? model
       let encoder = DatabaseEncoder(tableName: T.tableName)
       try model.encode(to: encoder)
       let (insertStatement, values) = encoder.insertStatement
@@ -64,7 +64,8 @@ extension LiteCrate {
     }
     
     public func delete<T: DatabaseCodable>(_ model: T) throws {
-      try delegate?.proxy(self, willDelete: model)
+      // TODO: fixme
+//      try delegate?.proxy(self, willDelete: model)
       try db.execute("DELETE FROM \(T.tableName) WHERE \(T.primaryKeyColumn) = ?", [model.primaryKeyValue])
     }
 
@@ -82,32 +83,10 @@ extension LiteCrate {
     internal var db: Database
     internal var isEnabled = true
 
-    private var time: Int64!
-    private var needToIncrementTime = false
-    
-    private func fetchTime() throws {
-      var cursor = try query("SELECT time FROM Node WHERE id = ?", [node])
-      if cursor.step() {
-        time = cursor.int(for: 0)
-      }
-      
-      cursor = try query("SELECT COALESCE(max(time), 0) FROM Node")
-      guard cursor.step() else { fatalError() } // Should be impossible. Though TODO: change this to a throw LOL
-      time = cursor.int(for: 0)
-    }
-    
-    func incrementTimeIfNeeded() throws  {
-      if needToIncrementTime {
-        try execute("INSERT OR REPLACE INTO Node(id, time) VALUES (?, ?)", [node, time + 1])
-      }
-    }
-    
-    internal var node: UUID
     private var delegate: (any LiteCrateDelegate)?
-    internal init(db: Database, delegate: (any LiteCrateDelegate)?, node: UUID) {
+    internal init(db: Database, delegate: (any LiteCrateDelegate)?) {
       self.db = db
       self.delegate = delegate
-      self.node = node
     }
   }
 }

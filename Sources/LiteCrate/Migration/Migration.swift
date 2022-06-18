@@ -8,7 +8,7 @@
 import Foundation
 
 @resultBuilder
-struct MigrationStepBuilder {
+public struct MigrationStepBuilder {
   static func buildBlock(_ migrationActions: any MigrationAction...) -> [any MigrationAction] {
     migrationActions
   }
@@ -23,7 +23,7 @@ public struct MigrationStep {
 }
 
 @resultBuilder
-struct MigrationBuilder {
+public struct MigrationBuilder {
   static func buildBlock(_ migrationSteps: MigrationStep...) -> Migration {
     Migration(steps: migrationSteps)
   }

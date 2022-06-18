@@ -119,7 +119,7 @@ class DatabaseEncoder: Encoder {
       case let value as SqliteRepresentable:
         encoder.columnToKey[key.stringValue] = value
       default:
-        fatalError("Incompatible type")
+        try value.encode(to: encoder)
       }
     }
 

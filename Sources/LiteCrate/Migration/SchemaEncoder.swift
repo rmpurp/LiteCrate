@@ -169,7 +169,7 @@ class SchemaEncoder: Encoder {
       case let value as SqliteRepresentable:
         try encode(sqliteRepresentable: value, forKey: key)
       default:
-        fatalError("Invalid type")
+        try value.encode(to: encoder)
       }
     }
 

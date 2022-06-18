@@ -62,7 +62,7 @@ public class Cursor {
       done = true
       return false
     default:
-      defer { sqlite3_finalize(statement) }
+      defer { close() }
       throw database.getError()
     }
   }
@@ -114,7 +114,7 @@ public class Cursor {
   /// This will be automatically called when this object is deinited.
   public func close() {
     guard !closed else { return }
-    defer { closed = true }
+    closed = true
     sqlite3_finalize(statement)
   }
 

@@ -8,10 +8,38 @@
 import Foundation
 import LiteCrate
 
-struct Dot<Model: ReplicatingModel>: DatabaseCodable, Identifiable {
-  var id: UUID
-  var modelID: UUID?
-
+public struct Dot: Codable {
+  init() {
+    timeCreated = -1
+    creator = UUID()
+    timeLastModified = nil
+    lastModifier = nil
+    witness = UUID()
+    timeLastWitnessed = -1
+  }
+  
+  var isInitialized: Bool {
+    return timeCreated < 0
+  }
+  
+  var isDeleted: Bool {
+    precondition(timeLastModified != nil && lastModifier != nil
+                 || timeLastModified == nil && lastModifier == nil)
+    return timeLastModified == nil
+  }
+  
+  mutating func update(modifiedBy node: UUID, at time: Int64) {
+    if !isInitialized {
+      timeCreated = time
+      creator = node
+    }
+    
+    timeLastModified = time
+    timeLastWitnessed = time
+    lastModifier = node
+    witness = node
+  }
+  
   var timeCreated: Int64
   var creator: UUID
   
@@ -20,23 +48,4 @@ struct Dot<Model: ReplicatingModel>: DatabaseCodable, Identifiable {
   
   var timeLastWitnessed: Int64
   var witness: UUID
-  
-  init(modelID: UUID, time: Int64, creator: UUID) {
-    self.id = UUID()
-    self.modelID = modelID
-    self.timeCreated = time
-    self.creator = creator
-    self.timeLastModified = time
-    self.lastModifier = creator
-    self.timeLastWitnessed = time
-    self.witness = creator
-  }
-  
-  static var tableName: String {
-    "crdt_" + Model.tableName
-  }
-
-  static var foreignKeys: [ForeignKey] {
-    return [ForeignKey("modelID", references: Model.tableName, targetColumn: Model.primaryKeyColumn, onDelete: .restrict)]
-  }
 }

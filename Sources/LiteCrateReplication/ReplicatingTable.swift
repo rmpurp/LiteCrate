@@ -19,11 +19,11 @@ struct TableNameCodingKey: CodingKey {
   init?(intValue: Int) {
     return nil
   }
-  
 }
 
 public class ReplicatingTable: Hashable {
   let tableName: String
+  
   init(tableName: String) {
     self.tableName = tableName
   }
@@ -45,7 +45,7 @@ public class ReplicatingTable: Hashable {
 }
 
 // TODO Change DatabaseCodable
-class ReplicatingTableImpl<T: DatabaseCodable>: ReplicatingTable {
+class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
   init(_ type: T.Type) {
     super.init(tableName: T.tableName)
   }
@@ -58,6 +58,11 @@ class ReplicatingTableImpl<T: DatabaseCodable>: ReplicatingTable {
   }
   
   override func fetch(proxy: LiteCrate.TransactionProxy) throws -> any Codable {
-    try proxy.fetch(T.self)
+//    var nodes = [Node]()
+    var models = [T]()
+//    for node in nodes {
+      models.append(contentsOf: try proxy.fetch(T.self, allWhere: "timeLastWitnessed >= ?", [0]))
+//    }
+    return models
   }
 }

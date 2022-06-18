@@ -8,11 +8,11 @@
 import LiteCrateCore
 import Foundation
 
-struct DatabaseDecoder: Decoder {
+class DatabaseDecoder: Decoder {
   struct KDC<Key: CodingKey>: KeyedDecodingContainerProtocol {
     var codingPath: [CodingKey] = []
     var allKeys: [Key] = []
-
+    var decoder: DatabaseDecoder
     var cursor: Cursor
 
     func contains(_ key: Key) -> Bool {
@@ -99,27 +99,35 @@ struct DatabaseDecoder: Decoder {
     func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64 {
       fatalError()
     }
-
-    func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
+    
+    func index(for key: Key) throws -> Int32 {
       guard let index = cursor.columnToIndex[key.stringValue] else {
         throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
       }
+      return index
+    }
+
+    func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
 
       switch type {
       case is Date.Type, is Date?.Type:
+        let index = try index(for: key)
         return cursor.date(for: index) as! T
       case is Data.Type, is Data?.Type:
+        let index = try index(for: key)
         return cursor.data(for: index) as! T
       case is UUID.Type, is UUID?.Type:
+        let index = try index(for: key)
         return cursor.uuid(for: index) as! T
       default:
-        fatalError("Unsupported type")
+        return try type.init(from: decoder)
+//        fatalError("Unsupported type")
       }
     }
 
     func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws
       -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
-      fatalError()
+        fatalError()
     }
 
     func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
@@ -140,10 +148,14 @@ struct DatabaseDecoder: Decoder {
   var codingPath: [CodingKey] = []
   var userInfo: [CodingUserInfoKey: Any] = [:]
   let cursor: Cursor
+  
+  init(cursor: Cursor) {
+    self.cursor = cursor
+  }
 
   func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key>
   where Key: CodingKey {
-    return KeyedDecodingContainer(KDC(cursor: cursor))
+    return KeyedDecodingContainer(KDC(decoder: self, cursor: cursor))
   }
 
   func unkeyedContainer() throws -> UnkeyedDecodingContainer {
