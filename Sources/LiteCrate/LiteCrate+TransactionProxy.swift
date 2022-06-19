@@ -25,7 +25,14 @@ extension LiteCrate {
       let decoder = DatabaseDecoder(cursor: cursor)
       var models = [T]()
       while cursor.step() {
-        try models.append(T(from: decoder))
+        let model = try T(from: decoder)
+        if let delegate {
+          if try delegate.filter(model: model) {
+            models.append(model)
+          }
+        } else {
+          models.append(model)
+        }
       }
       return models
     }
@@ -57,6 +64,10 @@ extension LiteCrate {
     
     public func save<T: DatabaseCodable>(_ model: T) throws {
       let model = try delegate?.proxy(self, willSave: model) ?? model
+      try _save(model)
+    }
+    
+    private func _save<T: DatabaseCodable>(_ model: T) throws {
       let encoder = DatabaseEncoder(tableName: T.tableName)
       try model.encode(to: encoder)
       let (insertStatement, values) = encoder.insertStatement
@@ -64,9 +75,11 @@ extension LiteCrate {
     }
     
     public func delete<T: DatabaseCodable>(_ model: T) throws {
-      // TODO: fixme
-//      try delegate?.proxy(self, willDelete: model)
-      try db.execute("DELETE FROM \(T.tableName) WHERE \(T.primaryKeyColumn) = ?", [model.primaryKeyValue])
+      if let model = try delegate?.proxy(self, willDelete: model) {
+        try _save(model)
+      } else {
+        try db.execute("DELETE FROM \(T.tableName) WHERE \(T.primaryKeyColumn) = ?", [model.primaryKeyValue])
+      }
     }
 
 

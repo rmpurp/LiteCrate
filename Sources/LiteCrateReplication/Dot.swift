@@ -10,6 +10,19 @@ import LiteCrate
 
 public struct Dot: Codable {
   init() {
+    version = UUID()
+    id = UUID()
+    timeCreated = -1
+    creator = UUID()
+    timeLastModified = nil
+    lastModifier = nil
+    witness = UUID()
+    timeLastWitnessed = -1
+  }
+  
+  init(id: UUID) {
+    version = UUID()
+    self.id = id
     timeCreated = -1
     creator = UUID()
     timeLastModified = nil
@@ -19,7 +32,7 @@ public struct Dot: Codable {
   }
   
   var isInitialized: Bool {
-    return timeCreated < 0
+    return timeCreated >= 0
   }
   
   var isDeleted: Bool {
@@ -35,17 +48,34 @@ public struct Dot: Codable {
     }
     
     timeLastModified = time
-    timeLastWitnessed = time
     lastModifier = node
+
+    timeLastWitnessed = time
+    witness = node
+  }
+
+  mutating func delete(modifiedBy node: UUID, at time: Int64) {
+    if !isInitialized {
+      timeCreated = time
+      creator = node
+    }
+    
+    timeLastModified = nil
+    lastModifier = nil
+
+    timeLastWitnessed = time
     witness = node
   }
   
-  var timeCreated: Int64
-  var creator: UUID
+  private(set) var version: UUID
+  private(set) var id: UUID
   
-  var timeLastModified: Int64?
-  var lastModifier: UUID?
+  private(set) var timeCreated: Int64
+  private(set) var creator: UUID
   
-  var timeLastWitnessed: Int64
-  var witness: UUID
+  private(set) var timeLastModified: Int64?
+  private(set) var lastModifier: UUID?
+  
+  private(set) var timeLastWitnessed: Int64
+  private(set) var witness: UUID
 }

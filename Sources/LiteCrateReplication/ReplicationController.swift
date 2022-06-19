@@ -14,6 +14,7 @@ class ReplicationController: LiteCrateDelegate {
   private var needToIncrementTime = false
   var replicatingTables = Set<ReplicatingTable>()
   var nodeID: UUID
+  var fetchDeletedModels: Bool = false
   var time: Int64!
   
   init(location: String, nodeID: UUID, @MigrationBuilder migrations: () -> Migration) throws {
@@ -24,6 +25,11 @@ class ReplicationController: LiteCrateDelegate {
   @discardableResult
   public func inTransaction<T>(block: @escaping (LiteCrate.TransactionProxy) throws -> T) throws -> T {
     return try liteCrate.inTransaction(block: block)
+  }
+  
+  func filter<T>(model: T) throws -> Bool where T : DatabaseCodable {
+    guard !fetchDeletedModels, let model = model as? any ReplicatingModel else { return true }
+    return !model.dot.isDeleted
   }
   
   func migration(didInitializeIn proxy: LiteCrate.TransactionProxy) throws {
@@ -39,6 +45,7 @@ class ReplicationController: LiteCrateDelegate {
   
   func transaction(didBeginIn proxy: LiteCrate.TransactionProxy) throws {
     needToIncrementTime = false
+    fetchDeletedModels = false
     let cursor = try proxy.query("SELECT time FROM Node WHERE id = ?", [nodeID])
     guard cursor.step() else { fatalError("Corrupt database.") }
     time = cursor.int(for: 0)
@@ -52,36 +59,22 @@ class ReplicationController: LiteCrateDelegate {
   }
   
   func proxy<T>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws -> T where T : DatabaseCodable {
-    if var model = model as? (any ReplicatingModel) {
+    if var model = model as? any ReplicatingModel {
+      try model.deleteCompetingModels(proxy, time: time, node: nodeID)
       needToIncrementTime = true
       model.dot.update(modifiedBy: nodeID, at: time)
+      return model as! T
     }
     return model
   }
-
+  
   func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willDelete model: T) throws -> T? {
-    if let model = model as? (any ReplicatingModel) {
-      // TODO: Logic
-//      try updateDot(in: proxy, deleting: model)
+    if var model = model as? (any ReplicatingModel) {
+      model.dot.delete(modifiedBy: nodeID, at: time)
+      return (model as! T)
     }
     return nil
   }
-  
-//  private func updateDot<T: ReplicatingModel>(in proxy: LiteCrate.TransactionProxy, deleting model: T) throws {
-//    needToIncrementTime = true
-//    if var dot = try proxy.fetch(Dot<T>.self,
-//                                 allWhere: "modelID = ? ORDER BY timeCreated DESC LIMIT 1",
-//                                 [model.primaryKeyValue]).first {
-//      dot.timeLastModified = nil
-//      dot.lastModifier = nil
-//      dot.timeLastWitnessed = time
-//      dot.witness = nodeID
-//      try proxy.save(dot)
-//    } else {
-//      let dot = Dot<T>(modelID: model.primaryKeyValue, time: time, creator: nodeID)
-//      try proxy.save(dot)
-//    }
-//  }
   
   func encode(clocks: [Node]) throws -> String {
     let encoder = JSONEncoder()
@@ -93,5 +86,21 @@ class ReplicationController: LiteCrateDelegate {
     let decoder = JSONDecoder()
     decoder.userInfo[CodingUserInfoKey(rawValue: "replicator")!] = self
     _ = try decoder.decode(CodableProxy.self, from: json.data(using: .utf8)!)
+  }
+}
+
+// Extension because generic sadness
+fileprivate extension ReplicatingModel {
+  func deleteCompetingModels(_ proxy: LiteCrate.TransactionProxy, time: Int64, node: UUID) throws {
+    // Avoid recursively calling delegate methods by updating rows directly
+    let query = """
+    UPDATE \(Self.tableName)
+        SET timeLastModified = NULL,
+            lastModifier = NULL,
+            timeLastWitnessed = ?,
+            witness = ?
+        WHERE id = ? AND version <> ?
+    """
+    try proxy.execute(query, [time, node, dot.id, dot.version])
   }
 }

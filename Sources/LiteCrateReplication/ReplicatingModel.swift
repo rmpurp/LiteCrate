@@ -11,3 +11,13 @@ import LiteCrate
 public protocol ReplicatingModel: DatabaseCodable<UUID> {
   var dot: Dot { get set }
 }
+
+extension ReplicatingModel {
+  public var primaryKeyValue: Key {
+    dot.version
+  }
+  
+  static public var primaryKeyColumn: String {
+    "version"
+  }
+}
