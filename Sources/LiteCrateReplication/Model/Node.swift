@@ -19,10 +19,10 @@ struct Node: DatabaseCodable, Identifiable {
     time = max(time, other.time)
   }
 
-  mutating func mergeForEncoding(_ other: Node) {
-    assert(other.id == id)
-    minTime = max(minTime, other.minTime)
-    time = min(time, other.time)
+  mutating func mergeForEncoding(_ other: Node?) {
+    assert(other.flatMap { $0.id == id } ?? true)
+    minTime = max(minTime, other?.minTime ?? 0)
+    time = min(time, other?.time ?? 0)
   }
   
   
@@ -48,12 +48,14 @@ struct Node: DatabaseCodable, Identifiable {
   /// send to the remote Node. This is only used for comparing times witnessed,
   /// and is not saved into any database. Therefore, any Nodes in the remoteNode
   /// array that is unknown to the localNode is not included in the output.
-  static func mergeForEncoding(localNodes: [Node], remoteNodes: [Node]) -> [UUID: Node] {
-    var mergedNodes = localNodes.toDict()
-    for node in remoteNodes {
-      mergedNodes[node.id]?.mergeForEncoding(node)
+  static func mergeForEncoding(localNodes: [Node], remoteNodes: [Node]) -> [Node] {
+    var mergedNodes = [UUID: Node]()
+    let remoteNodes = remoteNodes.toDict()
+    for var node in localNodes {
+      node.mergeForEncoding(remoteNodes[node.id])
+      mergedNodes[node.id] = node
     }
-    return mergedNodes
+    return [Node](mergedNodes.values)
   }
 }
 

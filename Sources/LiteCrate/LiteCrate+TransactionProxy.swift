@@ -18,6 +18,10 @@ extension LiteCrate {
     public func fetch<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type, with primaryKey: U) throws -> T? {
       return try fetch(type, allWhere: "\(T.primaryKeyColumn) = ?", [primaryKey]).first
     }
+    
+    public func fetchIgnoringDelegate<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type, with primaryKey: U) throws -> T? {
+      return try fetchIgnoringDelegate(type, allWhere: "\(T.primaryKeyColumn) = ?", [primaryKey]).first
+    }
 
     public func fetch<T: DatabaseCodable>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws -> [T] {
       let sqlWhereClause = sqlWhereClause ?? "TRUE"
@@ -36,7 +40,19 @@ extension LiteCrate {
       }
       return models
     }
+    
+    public func fetchIgnoringDelegate<T: DatabaseCodable>(_ type: T.Type, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws -> [T] {
+      let sqlWhereClause = sqlWhereClause ?? "TRUE"
+      let cursor = try db.query("SELECT * FROM \(T.tableName) WHERE \(sqlWhereClause)", values)
+      let decoder = DatabaseDecoder(cursor: cursor)
+      var models = [T]()
+      while cursor.step() {
+        models.append(try T(from: decoder))
+      }
+      return models
+    }
 
+    // TODO: Delete.
     public func fetch<T: DatabaseCodable>(_ type: T.Type, joining joinTable: String, on joinClause: String, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws -> [T] {
       let sqlWhereClause = sqlWhereClause ?? "TRUE"
       let cursor = try db.query("SELECT \(T.tableName).* FROM \(T.tableName) INNER JOIN \(joinTable) ON \(joinClause) WHERE \(sqlWhereClause)", values)
@@ -64,10 +80,11 @@ extension LiteCrate {
     
     public func save<T: DatabaseCodable>(_ model: T) throws {
       let model = try delegate?.proxy(self, willSave: model) ?? model
-      try _save(model)
+      try saveIgnoringDelegate(model)
     }
     
-    private func _save<T: DatabaseCodable>(_ model: T) throws {
+    /// Save the given model, bypassing any processing by the delegate.
+    public func saveIgnoringDelegate<T: DatabaseCodable>(_ model: T) throws {
       let encoder = DatabaseEncoder(tableName: T.tableName)
       try model.encode(to: encoder)
       let (insertStatement, values) = encoder.insertStatement
@@ -76,10 +93,14 @@ extension LiteCrate {
     
     public func delete<T: DatabaseCodable>(_ model: T) throws {
       if let model = try delegate?.proxy(self, willDelete: model) {
-        try _save(model)
+        try saveIgnoringDelegate(model)
       } else {
-        try db.execute("DELETE FROM \(T.tableName) WHERE \(T.primaryKeyColumn) = ?", [model.primaryKeyValue])
+        try deleteIgnoringDelegate(model)
       }
+    }
+    
+    public func deleteIgnoringDelegate<T: DatabaseCodable>(_ model: T) throws {
+      try db.execute("DELETE FROM \(T.tableName) WHERE \(T.primaryKeyColumn) = ?", [model.primaryKeyValue])
     }
 
 

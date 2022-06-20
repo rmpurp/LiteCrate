@@ -88,9 +88,18 @@ class ReplicationController: LiteCrateDelegate {
     return nil
   }
   
+  func clocks() throws -> [Node] {
+    var clocks = [Node]()
+    try inTransaction { proxy in
+      clocks = try proxy.fetch(Node.self)
+    }
+    return clocks
+  }
+  
   func encode(clocks: [Node]) throws -> String {
     let encoder = JSONEncoder()
     encoder.userInfo[CodingUserInfoKey(rawValue: "replicator")!] = self
+    encoder.userInfo[CodingUserInfoKey(rawValue: "nodes")!] = clocks
     return try String(data: encoder.encode(CodableProxy()), encoding: .utf8)!
   }
   
@@ -113,7 +122,13 @@ class ReplicationController: LiteCrateDelegate {
         for table in replicatingTables {
           try table.merge(localProxy: localProxy, remoteProxy: remoteProxy)
         }
-
+        
+        let localNodes = try localProxy.fetch(Node.self)
+        let remoteNodes = try remoteProxy.fetch(Node.self)
+        for node in Node.mergeForDecoding(nodeID: nodeID, localNodes: localNodes, remoteNodes: remoteNodes) {
+          try localProxy.saveIgnoringDelegate(node)
+        }
+        
         // TODO: Merge nodes
         assert(!needToIncrementTime)
       }
@@ -123,6 +138,9 @@ class ReplicationController: LiteCrateDelegate {
 
 // Extension because generic sadness
 fileprivate extension ReplicatingModel {
+  /// Delete models with the same id but a different version.
+  /// time: the current time to update the time witnessed to
+  /// node: the witness
   func deleteCompetingModels(_ proxy: LiteCrate.TransactionProxy, time: Int64, node: UUID) throws {
     // Avoid recursively calling delegate methods by updating rows directly
     let query = """

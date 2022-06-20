@@ -29,8 +29,6 @@ extension Boss: CustomDebugStringConvertible {
   var debugDescription: String {
     return "Boss(age:\(age), version:\(dot.version.short), id:\(dot.id.short))"
   }
-  
-  
 }
 
 final class MergeTests: XCTestCase {
@@ -94,20 +92,37 @@ final class MergeTests: XCTestCase {
       XCTAssertEqual(2, actual.count)
     }
   }
-
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+  
+  func testDelta() throws {
+    let db1 = try ReplicationController(location: ":memory:", nodeID: UUID()) {
+      CreateReplicatingTable(Boss(age: 0))
+    }
+    
+    try db1.inTransaction { proxy in
+      try proxy.save(Boss(age: 25))
     }
 
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+    try db1.inTransaction { proxy in
+      try proxy.save(Boss(age: 30))
     }
-
-    func testExample() throws {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // Any test you write for XCTest can be annotated as throws and async.
-        // Mark your test throws to produce an unexpected failure when your test encounters an uncaught error.
-        // Mark your test async to allow awaiting for asynchronous code to complete. Check the results with assertions afterwards.
+    
+    let test = { clock, expectedCount in
+      let db2 = try ReplicationController(location: ":memory:", nodeID: UUID()) {
+        CreateReplicatingTable(Boss(age: 0))
+      }
+      
+      let payload = try db1.encode(clocks: [Node(id: db1.nodeID, minTime: 0, time: clock)])
+      try db2.decode(from: payload)
+      
+      try db2.inTransaction { proxy in
+        let bosses = try proxy.fetch(Boss.self)
+        XCTAssertEqual(bosses.count, expectedCount)
+      }
     }
+    
+    try test(0, 2)
+    try test(1, 1)
+    try test(2, 0)
+    try test(3, 0)
+  }
 }

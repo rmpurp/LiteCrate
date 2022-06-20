@@ -81,8 +81,8 @@ public struct Dot: Codable {
     return  lhsTimeModified < rhsTimeModified
   }
   
-  private(set) var version: UUID
-  private(set) var id: UUID
+  var version: UUID
+  var id: UUID
   
   private(set) var timeCreated: Int64
   private(set) var creator: UUID

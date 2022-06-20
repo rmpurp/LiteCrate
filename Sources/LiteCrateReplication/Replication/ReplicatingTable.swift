@@ -41,7 +41,7 @@ public static func == (lhs: ReplicatingTable, rhs: ReplicatingTable) -> Bool {
     hasher.combine(tableName)
   }
   
-  func fetch(proxy: LiteCrate.TransactionProxy) throws -> any Codable {
+  func fetch(proxy: LiteCrate.TransactionProxy, mergedNodes: [Node]) throws -> any Codable {
     fatalError("Abstract Method")
   }
   
@@ -63,19 +63,23 @@ class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
   override func populate(proxy: LiteCrate.TransactionProxy, decodingContainer: KeyedDecodingContainer<TableNameCodingKey>) throws {
     let instances = try decodingContainer.decode([T].self, forKey: codingKey)
     for instance in instances {
-      try proxy.save(instance)
+      try proxy.saveIgnoringDelegate(instance)
     }
   }
   
-  override func fetch(proxy: LiteCrate.TransactionProxy) throws -> any Codable {
-//    var nodes = [Node]()
+  override func fetch(proxy: LiteCrate.TransactionProxy, mergedNodes: [Node]) throws -> any Codable {
     var models = [T]()
-//    for node in nodes {
-      models.append(contentsOf: try proxy.fetch(T.self, allWhere: "timeLastWitnessed >= ?", [0]))
-//    }
+    for node in mergedNodes {
+      models.append(contentsOf: try proxy.fetch(
+        T.self,
+        allWhere: "witness = ? AND timeLastWitnessed >= ?",
+        [node.id, node.time])
+      )
+    }
     return models
   }
   
+  /// If it exists, get the dot corresponding to the model with the same id and not null.
   func getCorrespondingDot(proxy: LiteCrate.TransactionProxy, dot: Dot) throws -> Dot? {
     if let localExactVersion = try proxy.fetch(T.self, with: dot.version) {
       return localExactVersion.dot

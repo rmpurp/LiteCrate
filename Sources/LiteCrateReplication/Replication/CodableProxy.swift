@@ -38,21 +38,21 @@ class CodableProxy: Codable {
       preconditionFailure()
     }
     
-//    guard let nodes = encoder.userInfo[CodingUserInfoKey(rawValue: "nodes")!] as? [Node] else {
-//      preconditionFailure()
-//    }
+    guard let remoteNodes = encoder.userInfo[CodingUserInfoKey(rawValue: "nodes")!] as? [Node] else {
+      preconditionFailure()
+    }
     
-    let remoteNodes = [Node]()
     var container = encoder.container(keyedBy: TableNameCodingKey.self)
     
     try db.inTransaction { proxy in
+      db.fetchDeletedModels = true
       let localNodes = try proxy.fetch(Node.self)
 
       let nodes = Node.mergeForEncoding(localNodes: localNodes, remoteNodes: remoteNodes)
       // TODO: Optimized fetching.
       
       for replicatingTable in db.replicatingTables {
-        try container.encode(replicatingTable.fetch(proxy: proxy),
+        try container.encode(replicatingTable.fetch(proxy: proxy, mergedNodes: nodes),
                              forKey: replicatingTable.codingKey)
       }
       try container.encode(localNodes, forKey: TableNameCodingKey(stringValue: Node.tableName))
