@@ -11,6 +11,7 @@ import LiteCrateCore
 public protocol LiteCrateDelegate {
   func transaction(didBeginIn proxy: LiteCrate.TransactionProxy) throws
   func transaction(willCommitIn proxy: LiteCrate.TransactionProxy) throws
+  func transactionDidEnd()
   func migration(didInitializeIn proxy: LiteCrate.TransactionProxy) throws
   func migration<A: MigrationAction>(willRun action: A) throws
   func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws -> T
@@ -23,6 +24,7 @@ public protocol LiteCrateDelegate {
 public extension LiteCrateDelegate {
   func transaction(didBeginIn proxy: LiteCrate.TransactionProxy) throws {}
   func transaction(willCommitIn proxy: LiteCrate.TransactionProxy) throws {}
+  func transactionDidEnd() {}
   func migration(didInitializeIn proxy: LiteCrate.TransactionProxy) throws {}
   func migration<A: MigrationAction>(willRun action: A) throws {}
   func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws -> T { model }

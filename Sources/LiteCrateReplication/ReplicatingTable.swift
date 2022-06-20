@@ -42,6 +42,10 @@ public class ReplicatingTable: Hashable {
   func populate(proxy: LiteCrate.TransactionProxy, decodingContainer: KeyedDecodingContainer<TableNameCodingKey>) throws {
     fatalError("Abstract Method")
   }
+  
+  func merge(localProxy: LiteCrate.TransactionProxy, remoteProxy: LiteCrate.TransactionProxy) throws {
+    fatalError("Abstract Method")
+  }
 }
 
 // TODO Change DatabaseCodable
@@ -65,4 +69,31 @@ class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
 //    }
     return models
   }
+  
+  func getCorrespondingDot(proxy: LiteCrate.TransactionProxy, dot: Dot) throws -> Dot? {
+    if let localExactVersion = try proxy.fetch(T.self, with: dot.version) {
+      return localExactVersion.dot
+    } else if let activeLocalVersion = try proxy.fetch(T.self, allWhere: "timeLastModified IS NOT NULL AND id = ?", [dot.id]).first {
+      return activeLocalVersion.dot
+    }
+    return nil
+  }
+  
+  
+  override func merge(localProxy: LiteCrate.TransactionProxy, remoteProxy: LiteCrate.TransactionProxy) throws {
+    // TODO: client logic
+    let remoteModels = try remoteProxy.fetch(T.self)
+    for remoteModel in remoteModels {
+      // TODO: if last witnessed < witnessing client's min time, consider deleted
+      guard let localDot = try getCorrespondingDot(proxy: localProxy, dot: remoteModel.dot) else {
+        try localProxy.save(remoteModel)
+        continue
+      }
+      
+      if localDot < remoteModel.dot {
+        try localProxy.save(remoteModel)
+      }
+    }
+  }
+
 }

@@ -31,7 +31,7 @@ fileprivate struct Customer: ReplicatingModel, Identifiable {
 final class ReplicationDelegateTests: XCTestCase {
   func testTime() throws {
     let crate = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-      MigrationStep {
+      MigrationGroup {
         CreateReplicatingTable(Employee(id: UUID(), name: ""))
         CreateTable(Boss(id: UUID(), rank: 0))
       }
@@ -56,7 +56,7 @@ final class ReplicationDelegateTests: XCTestCase {
   
     func testPayload() throws {
       let crate = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-        MigrationStep {
+        MigrationGroup {
           CreateReplicatingTable(Employee(id: UUID(), name: ""))
           CreateReplicatingTable(Customer(id: UUID(), orderArrived: 0))
         }
@@ -76,7 +76,7 @@ final class ReplicationDelegateTests: XCTestCase {
       
       
       let crate2 = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-        MigrationStep {
+        MigrationGroup {
           CreateReplicatingTable(Employee(id: UUID(), name: ""))
           CreateReplicatingTable(Customer(id: UUID(), orderArrived: 0))
         }

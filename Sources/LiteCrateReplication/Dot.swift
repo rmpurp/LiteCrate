@@ -14,8 +14,8 @@ public struct Dot: Codable {
     id = UUID()
     timeCreated = -1
     creator = UUID()
-    timeLastModified = nil
-    lastModifier = nil
+    timeLastModified = -1
+    lastModifier = UUID()
     witness = UUID()
     timeLastWitnessed = -1
   }
@@ -25,8 +25,8 @@ public struct Dot: Codable {
     self.id = id
     timeCreated = -1
     creator = UUID()
-    timeLastModified = nil
-    lastModifier = nil
+    timeLastModified = -1
+    lastModifier = UUID()
     witness = UUID()
     timeLastWitnessed = -1
   }
@@ -67,6 +67,20 @@ public struct Dot: Codable {
     witness = node
   }
   
+  static func < (lhs: Self, rhs: Self) -> Bool {
+    // Deletions always "newer" aka greater
+    
+    guard lhs.id == rhs.id else { fatalError("These Dots are not comparable as they have different stable ids.") }
+    if lhs.isDeleted && rhs.isDeleted {
+      return false
+    }
+    
+    guard let lhsTimeModified = lhs.timeLastModified else { return false }
+    guard let rhsTimeModified = rhs.timeLastModified else { return true } // rhs deleted, so "newer"
+    
+    return  lhsTimeModified < rhsTimeModified
+  }
+  
   private(set) var version: UUID
   private(set) var id: UUID
   
@@ -79,3 +93,5 @@ public struct Dot: Codable {
   private(set) var timeLastWitnessed: Int64
   private(set) var witness: UUID
 }
+
+extension Dot: Equatable {}

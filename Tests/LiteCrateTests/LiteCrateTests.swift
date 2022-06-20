@@ -21,7 +21,7 @@ final class LiteCrateTests: XCTestCase {
   func testSaveAndFetch() throws {
     let person = Person(name: "Bob", dogID: UUID())
     let crate = try LiteCrate(":memory:") {
-      MigrationStep {
+      MigrationGroup {
         CreateTable(Person(name: "", dogID: UUID()))
       }
     }

@@ -12,6 +12,7 @@ import LiteCrateCore
 class ReplicationController: LiteCrateDelegate {
   private var liteCrate: LiteCrate! = nil
   private var needToIncrementTime = false
+  private var merging = false
   var replicatingTables = Set<ReplicatingTable>()
   var nodeID: UUID
   var fetchDeletedModels: Bool = false
@@ -51,18 +52,26 @@ class ReplicationController: LiteCrateDelegate {
     time = cursor.int(for: 0)
   }
   
+  func transactionDidEnd() {
+    needToIncrementTime = false
+    merging = false
+  }
+  
   func transaction(willCommitIn proxy: LiteCrate.TransactionProxy) throws {
     if needToIncrementTime {
       try proxy.execute("UPDATE Node SET time = time + 1 WHERE id = ?", [nodeID])
-      needToIncrementTime = false
     }
   }
   
   func proxy<T>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws -> T where T : DatabaseCodable {
     if var model = model as? any ReplicatingModel {
-      try model.deleteCompetingModels(proxy, time: time, node: nodeID)
-      needToIncrementTime = true
-      model.dot.update(modifiedBy: nodeID, at: time)
+      if !model.dot.isDeleted {
+        try model.deleteCompetingModels(proxy, time: time, node: nodeID)
+      }
+      if !merging {
+        needToIncrementTime = true
+        model.dot.update(modifiedBy: nodeID, at: time)
+      }
       return model as! T
     }
     return model
@@ -71,6 +80,9 @@ class ReplicationController: LiteCrateDelegate {
   func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willDelete model: T) throws -> T? {
     if var model = model as? (any ReplicatingModel) {
       model.dot.delete(modifiedBy: nodeID, at: time)
+      if !merging {
+        needToIncrementTime = true
+      }
       return (model as! T)
     }
     return nil
@@ -86,6 +98,26 @@ class ReplicationController: LiteCrateDelegate {
     let decoder = JSONDecoder()
     decoder.userInfo[CodingUserInfoKey(rawValue: "replicator")!] = self
     _ = try decoder.decode(CodableProxy.self, from: json.data(using: .utf8)!)
+  }
+  
+  func merge(_ otherDB: ReplicationController) throws {
+    assert(otherDB !== self)
+    
+
+    try inTransaction { [unowned self] localProxy in
+      try otherDB.inTransaction { [unowned self] remoteProxy in
+        merging = true
+        fetchDeletedModels = true
+        otherDB.fetchDeletedModels = true
+        
+        for table in replicatingTables {
+          try table.merge(localProxy: localProxy, remoteProxy: remoteProxy)
+        }
+
+        // TODO: Merge nodes
+        assert(!needToIncrementTime)
+      }
+    }
   }
 }
 

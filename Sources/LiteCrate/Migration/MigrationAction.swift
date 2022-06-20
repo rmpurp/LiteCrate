@@ -7,8 +7,16 @@
 
 import Foundation
 
-public protocol MigrationAction {
+public protocol MigrationAction: MigrationStep {
   func perform(in proxy: LiteCrate.TransactionProxy) throws
+}
+
+extension MigrationAction {
+  public var asGroup: MigrationGroup {
+    return MigrationGroup {
+      self
+    }
+  }
 }
 
 public struct CreateTable<T: DatabaseCodable>: MigrationAction {

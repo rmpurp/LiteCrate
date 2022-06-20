@@ -11,14 +11,12 @@ import XCTest
 @testable import LiteCrateReplication
 @testable import LiteCrate
 
-fileprivate struct Employee: ReplicatingModel, Identifiable {
-  var id: UUID
+fileprivate struct Employee: ReplicatingModel {
   var name: String
   var dot: Dot = Dot()
 }
 
-fileprivate struct Boss: ReplicatingModel, Identifiable {
-  var id: UUID
+fileprivate struct Boss: ReplicatingModel {
   var rank: Int64
   var dot: Dot = Dot()
 }
@@ -26,26 +24,12 @@ fileprivate struct Boss: ReplicatingModel, Identifiable {
 final class MigrationTests: XCTestCase {
   func testMigration() throws {
     let controller = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-      MigrationStep {
-        CreateReplicatingTable(Employee(id: UUID(), name: ""))
-        CreateReplicatingTable(Boss(id: UUID(), rank: 0))
+      MigrationGroup {
+        CreateReplicatingTable(Employee(name: ""))
+        CreateReplicatingTable(Boss(rank: 0))
       }
-
-//      MigrationStep {
-//        Execute("INSERT INTO Boss (id, rank) VALUES ('900D0D82-0748-4D87-AC65-BF702D1202A3', 5)")
-//      }
     }
     
-    try controller.inTransaction { proxy in
-      try proxy.save(Boss(id: UUID(uuidString: "900D0D82-0748-4D87-AC65-BF702D1202A3")!, rank: 5))
-      let bosses = try proxy.fetch(Boss.self)
-      XCTAssertEqual(bosses.count, 1)
-      XCTAssertEqual(bosses.first!.id, UUID(uuidString: "900D0D82-0748-4D87-AC65-BF702D1202A3")!)
-      XCTAssertEqual(bosses.first!.rank, 5)
-
-      let employee = try proxy.fetch(Employee.self)
-      XCTAssertNil(employee.first)
-    }
     XCTAssertEqual(controller.replicatingTables, Set([ReplicatingTableImpl(Employee.self), ReplicatingTableImpl(Boss.self)]))
   }
 //

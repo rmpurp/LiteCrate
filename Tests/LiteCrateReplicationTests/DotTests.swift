@@ -19,7 +19,7 @@ fileprivate struct Boss: ReplicatingModel {
 final class DotTests: XCTestCase {
   func testDotCreation() throws {
     let db = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-      MigrationStep {
+      MigrationGroup {
         CreateReplicatingTable(Boss(age: 0))
       }
     }
@@ -57,7 +57,7 @@ final class DotTests: XCTestCase {
   
   func testDotDeletion() throws {
     let db = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-      MigrationStep {
+      MigrationGroup {
         CreateReplicatingTable(Boss(age: 0))
       }
     }

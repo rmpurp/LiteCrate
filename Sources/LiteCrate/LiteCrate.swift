@@ -59,7 +59,7 @@ public class LiteCrate {
     let proxy = TransactionProxy(db: db, delegate: delegate)
     
     defer { proxy.isEnabled = false }
-    
+    defer { delegate?.transactionDidEnd() }
     do {
       try proxy.db.beginTransaction()
       try delegate?.transaction(didBeginIn: proxy)
