@@ -27,7 +27,7 @@ extension UUID {
 
 extension Boss: CustomDebugStringConvertible {
   var debugDescription: String {
-    return "Boss(age:\(age), version:\(dot.version.short), id:\(dot.id.short))"
+    return "Boss(age:\(age), dot: \(dot)"
   }
 }
 

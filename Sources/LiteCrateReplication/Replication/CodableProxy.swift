@@ -45,11 +45,9 @@ class CodableProxy: Codable {
     var container = encoder.container(keyedBy: TableNameCodingKey.self)
     
     try db.inTransaction { proxy in
-      db.fetchDeletedModels = true
-      let localNodes = try proxy.fetch(Node.self)
+      let localNodes = try proxy.fetchIgnoringDelegate(Node.self)
 
       let nodes = Node.mergeForEncoding(localNodes: localNodes, remoteNodes: remoteNodes)
-      // TODO: Optimized fetching.
       
       for replicatingTable in db.replicatingTables {
         try container.encode(replicatingTable.fetch(proxy: proxy, mergedNodes: nodes),

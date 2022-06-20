@@ -49,7 +49,7 @@ public static func == (lhs: ReplicatingTable, rhs: ReplicatingTable) -> Bool {
     fatalError("Abstract Method")
   }
   
-  func merge(localProxy: LiteCrate.TransactionProxy, remoteProxy: LiteCrate.TransactionProxy) throws {
+  func merge(nodeID: UUID, time: Int64, localProxy: LiteCrate.TransactionProxy, remoteProxy: LiteCrate.TransactionProxy) throws {
     fatalError("Abstract Method")
   }
 }
@@ -70,7 +70,7 @@ class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
   override func fetch(proxy: LiteCrate.TransactionProxy, mergedNodes: [Node]) throws -> any Codable {
     var models = [T]()
     for node in mergedNodes {
-      models.append(contentsOf: try proxy.fetch(
+      models.append(contentsOf: try proxy.fetchIgnoringDelegate(
         T.self,
         allWhere: "witness = ? AND timeLastWitnessed >= ?",
         [node.id, node.time])
@@ -80,21 +80,20 @@ class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
   }
   
   /// If it exists, get the dot corresponding to the model with the same id and not null.
-  func getCorrespondingDot(proxy: LiteCrate.TransactionProxy, dot: Dot) throws -> Dot? {
-    if let localExactVersion = try proxy.fetch(T.self, with: dot.version) {
-      return localExactVersion.dot
-    } else if let activeLocalVersion = try proxy.fetch(T.self, allWhere: "timeLastModified IS NOT NULL AND id = ?", [dot.id]).first {
-      return activeLocalVersion.dot
-    }
-    return nil
+  func getActiveWithSameID(proxy: LiteCrate.TransactionProxy, dot: Dot) throws -> T? {
+    return try proxy.fetch(T.self, allWhere: "timeLastModified IS NOT NULL AND id = ?", [dot.id]).first
+  }
+  
+  func getWithSameVersion(proxy: LiteCrate.TransactionProxy, dot: Dot) throws -> T? {
+    return try proxy.fetch(T.self, with: dot.version)
   }
   
   
-  override func merge(localProxy: LiteCrate.TransactionProxy, remoteProxy: LiteCrate.TransactionProxy) throws {
-    let nodes = try localProxy.fetch(Node.self)
+  override func merge(nodeID: UUID, time: Int64, localProxy: LiteCrate.TransactionProxy, remoteProxy: LiteCrate.TransactionProxy) throws {
+    let nodes = try localProxy.fetchIgnoringDelegate(Node.self)
     let nodeDict = [UUID: Node](uniqueKeysWithValues: nodes.lazy.map { ($0.id, $0) })
 
-    let remoteModels = try remoteProxy.fetch(T.self)
+    let remoteModels = try remoteProxy.fetchIgnoringDelegate(T.self)
     for remoteModel in remoteModels {
       if let localWitness = nodeDict[remoteModel.dot.witness],
          localWitness.minTime > remoteModel.dot.timeLastWitnessed {
@@ -102,13 +101,27 @@ class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
         continue
       }
       
-      guard let localDot = try getCorrespondingDot(proxy: localProxy, dot: remoteModel.dot) else {
-        try localProxy.save(remoteModel)
+      // If new version, just insert it.
+      // If existing version, replace with remote model if remote is newer.
+      // Get the version created most recently and delete competing versions.
+      guard let localModel = try getActiveWithSameID(proxy: localProxy, dot: remoteModel.dot) else {
+        try localProxy.saveIgnoringDelegate(remoteModel)
         continue
       }
       
-      if localDot < remoteModel.dot {
-        try localProxy.save(remoteModel)
+      if let sameVersionLocalModel = try getWithSameVersion(proxy: localProxy, dot: remoteModel.dot) {
+        if sameVersionLocalModel.dot < remoteModel.dot {
+          try localProxy.saveIgnoringDelegate(remoteModel)
+        }
+      } else {
+        // LocalModel with different id exists, but this is a new version.
+        try localProxy.saveIgnoringDelegate(remoteModel)
+      }
+      
+      if localModel.dot < remoteModel.dot {
+        try remoteModel.deleteCompetingModels(localProxy, time: time, node: nodeID)
+      } else {
+        try localModel.deleteCompetingModels(localProxy, time: time, node: nodeID)
       }
     }
   }

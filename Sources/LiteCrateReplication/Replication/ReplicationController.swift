@@ -11,11 +11,11 @@ import LiteCrateCore
 
 class ReplicationController: LiteCrateDelegate {
   private var liteCrate: LiteCrate! = nil
+
   private var needToIncrementTime = false
-  private var merging = false
+
   var replicatingTables = Set<ReplicatingTable>()
   var nodeID: UUID
-  var fetchDeletedModels: Bool = false
   var time: Int64!
   
   init(location: String, nodeID: UUID, @MigrationBuilder migrations: () -> Migration) throws {
@@ -29,7 +29,7 @@ class ReplicationController: LiteCrateDelegate {
   }
   
   func filter<T>(model: T) throws -> Bool where T : DatabaseCodable {
-    guard !fetchDeletedModels, let model = model as? any ReplicatingModel else { return true }
+    guard let model = model as? any ReplicatingModel else { return true }
     return !model.dot.isDeleted
   }
   
@@ -46,7 +46,6 @@ class ReplicationController: LiteCrateDelegate {
   
   func transaction(didBeginIn proxy: LiteCrate.TransactionProxy) throws {
     needToIncrementTime = false
-    fetchDeletedModels = false
     let cursor = try proxy.query("SELECT time FROM Node WHERE id = ?", [nodeID])
     guard cursor.step() else { fatalError("Corrupt database.") }
     time = cursor.int(for: 0)
@@ -54,7 +53,6 @@ class ReplicationController: LiteCrateDelegate {
   
   func transactionDidEnd() {
     needToIncrementTime = false
-    merging = false
   }
   
   func transaction(willCommitIn proxy: LiteCrate.TransactionProxy) throws {
@@ -68,10 +66,9 @@ class ReplicationController: LiteCrateDelegate {
       if !model.dot.isDeleted {
         try model.deleteCompetingModels(proxy, time: time, node: nodeID)
       }
-      if !merging {
-        needToIncrementTime = true
-        model.dot.update(modifiedBy: nodeID, at: time)
-      }
+      needToIncrementTime = true
+      model.dot.update(modifiedBy: nodeID, at: time)
+
       return model as! T
     }
     return model
@@ -80,9 +77,7 @@ class ReplicationController: LiteCrateDelegate {
   func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willDelete model: T) throws -> T? {
     if var model = model as? (any ReplicatingModel) {
       model.dot.delete(modifiedBy: nodeID, at: time)
-      if !merging {
-        needToIncrementTime = true
-      }
+      needToIncrementTime = true
       return (model as! T)
     }
     return nil
@@ -115,12 +110,8 @@ class ReplicationController: LiteCrateDelegate {
 
     try inTransaction { [unowned self] localProxy in
       try otherDB.inTransaction { [unowned self] remoteProxy in
-        merging = true
-        fetchDeletedModels = true
-        otherDB.fetchDeletedModels = true
-        
         for table in replicatingTables {
-          try table.merge(localProxy: localProxy, remoteProxy: remoteProxy)
+          try table.merge(nodeID: nodeID, time: time, localProxy: localProxy, remoteProxy: remoteProxy)
         }
         
         let localNodes = try localProxy.fetch(Node.self)
@@ -129,15 +120,14 @@ class ReplicationController: LiteCrateDelegate {
           try localProxy.saveIgnoringDelegate(node)
         }
         
-        // TODO: Merge nodes
-        assert(!needToIncrementTime)
+//        assert(!needToIncrementTime)
       }
     }
   }
 }
 
 // Extension because generic sadness
-fileprivate extension ReplicatingModel {
+extension ReplicatingModel {
   /// Delete models with the same id but a different version.
   /// time: the current time to update the time witnessed to
   /// node: the witness

@@ -48,7 +48,7 @@ final class OverallTests: XCTestCase {
         Verify(databaseID: 1, values: [3, 4, 5, 6, 7, 11, 12])
         Merge(fromID: 0, toID: 1, debugValue: 1, payloadValues: [10])
         Verify(databaseID: 1, values: [3, 4, 5, 6, 7, 11, 12])
-        Merge(fromID: 1, toID: 0, payloadValues: [11, 12])
+        Merge(fromID: 1, toID: 0, payloadValues: [10, 11, 12])
         Verify(databaseID: 0, values: [3, 4, 5, 6, 7, 11, 12])
       }
     }

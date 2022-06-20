@@ -74,9 +74,7 @@ final class DotTests: XCTestCase {
       
       XCTAssertNil(try proxy.fetch(Boss.self, with: boss1.primaryKeyValue))
       
-      db.fetchDeletedModels = true
-      
-      let boss1Fetched = try proxy.fetch(Boss.self, with: boss1.primaryKeyValue)!
+      let boss1Fetched = try proxy.fetchIgnoringDelegate(Boss.self, with: boss1.primaryKeyValue)!
       XCTAssertEqual(boss1Fetched.age, 42)
       XCTAssertEqual(boss1Fetched.dot.isDeleted, true)
       XCTAssertNil(boss1Fetched.dot.timeLastModified)
@@ -92,8 +90,7 @@ final class DotTests: XCTestCase {
     try db.inTransaction { proxy in
       try proxy.delete(boss1Version2)
       XCTAssertNil(try proxy.fetch(Boss.self, with: boss1Version2.primaryKeyValue))
-      db.fetchDeletedModels = true
-      XCTAssertNotNil(try proxy.fetch(Boss.self, with: boss1Version2.primaryKeyValue))
+      XCTAssertNotNil(try proxy.fetchIgnoringDelegate(Boss.self, with: boss1Version2.primaryKeyValue))
     }
   }
 }

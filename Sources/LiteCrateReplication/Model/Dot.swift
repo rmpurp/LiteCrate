@@ -69,16 +69,23 @@ public struct Dot: Codable {
   
   static func < (lhs: Self, rhs: Self) -> Bool {
     // Deletions always "newer" aka greater
+    precondition(lhs.id == rhs.id, "These Dots are not comparable as they have different stable ids.")
     
-    guard lhs.id == rhs.id else { fatalError("These Dots are not comparable as they have different stable ids.") }
     if lhs.isDeleted && rhs.isDeleted {
       return false
     }
     
-    guard let lhsTimeModified = lhs.timeLastModified else { return false }
-    guard let rhsTimeModified = rhs.timeLastModified else { return true } // rhs deleted, so "newer"
-    
-    return  lhsTimeModified < rhsTimeModified
+    if lhs.version == rhs.version {
+      guard let lhsTimeModified = lhs.timeLastModified else { return false }
+      guard let rhsTimeModified = rhs.timeLastModified else { return true } // rhs deleted, so "newer"
+      
+      return  lhsTimeModified < rhsTimeModified
+    } else {
+      if lhs.timeCreated == rhs.timeCreated {
+        return lhs.creator.uuidString < rhs.creator.uuidString
+      }
+      return lhs.timeCreated < rhs.timeCreated
+    }
   }
   
   var version: UUID
