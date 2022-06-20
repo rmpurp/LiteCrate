@@ -34,8 +34,8 @@ class ReplicationController: LiteCrateDelegate {
   }
   
   func migration(didInitializeIn proxy: LiteCrate.TransactionProxy) throws {
-    try proxy.execute("CREATE TABLE Node (id TEXT PRIMARY KEY, time INT NOT NULL)")
-    try proxy.execute("INSERT INTO Node VALUES (?, ?)", [nodeID, 0])
+    try proxy.execute("CREATE TABLE Node (id TEXT PRIMARY KEY, time INT NOT NULL, minTime INT NOT NULL)")
+    try proxy.execute("INSERT INTO Node VALUES (?, 0, 0)", [nodeID])
   }
   
   func migration<A>(willRun action: A) where A : MigrationAction {

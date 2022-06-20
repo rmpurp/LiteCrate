@@ -7,6 +7,7 @@
 
 import Foundation
 import LiteCrate
+
 struct TableNameCodingKey: CodingKey {
   var stringValue: String
   
@@ -27,7 +28,12 @@ public class ReplicatingTable: Hashable {
   init(tableName: String) {
     self.tableName = tableName
   }
-  public static func == (lhs: ReplicatingTable, rhs: ReplicatingTable) -> Bool {
+  
+  var codingKey: TableNameCodingKey {
+    .init(stringValue: tableName)
+  }
+  
+public static func == (lhs: ReplicatingTable, rhs: ReplicatingTable) -> Bool {
     return lhs.tableName == rhs.tableName
   }
   
@@ -55,7 +61,7 @@ class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
   }
   
   override func populate(proxy: LiteCrate.TransactionProxy, decodingContainer: KeyedDecodingContainer<TableNameCodingKey>) throws {
-    let instances = try decodingContainer.decode([T].self, forKey: .init(stringValue: tableName))
+    let instances = try decodingContainer.decode([T].self, forKey: codingKey)
     for instance in instances {
       try proxy.save(instance)
     }
@@ -81,10 +87,17 @@ class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
   
   
   override func merge(localProxy: LiteCrate.TransactionProxy, remoteProxy: LiteCrate.TransactionProxy) throws {
-    // TODO: client logic
+    let nodes = try localProxy.fetch(Node.self)
+    let nodeDict = [UUID: Node](uniqueKeysWithValues: nodes.lazy.map { ($0.id, $0) })
+
     let remoteModels = try remoteProxy.fetch(T.self)
     for remoteModel in remoteModels {
-      // TODO: if last witnessed < witnessing client's min time, consider deleted
+      if let localWitness = nodeDict[remoteModel.dot.witness],
+         localWitness.minTime > remoteModel.dot.timeLastWitnessed {
+        // This has been deleted.
+        continue
+      }
+      
       guard let localDot = try getCorrespondingDot(proxy: localProxy, dot: remoteModel.dot) else {
         try localProxy.save(remoteModel)
         continue
@@ -95,5 +108,4 @@ class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
       }
     }
   }
-
 }
