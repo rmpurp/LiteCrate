@@ -40,14 +40,7 @@ public static func == (lhs: ReplicatingTable, rhs: ReplicatingTable) -> Bool {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(tableName)
   }
-  
-  func fetch(proxy: LiteCrate.TransactionProxy, mergedNodes: [Node]) throws -> any Codable {
-    fatalError("Abstract Method")
-  }
-  
-  func populate(proxy: LiteCrate.TransactionProxy, decodingContainer: KeyedDecodingContainer<TableNameCodingKey>) throws {
-    fatalError("Abstract Method")
-  }
+
   
   func merge(nodeID: UUID, time: Int64, localProxy: LiteCrate.TransactionProxy, remoteProxy: LiteCrate.TransactionProxy) throws {
     fatalError("Abstract Method")
@@ -58,25 +51,6 @@ public static func == (lhs: ReplicatingTable, rhs: ReplicatingTable) -> Bool {
 class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
   init(_ instance: T) {
     super.init(tableName: T.tableName)
-  }
-  
-  override func populate(proxy: LiteCrate.TransactionProxy, decodingContainer: KeyedDecodingContainer<TableNameCodingKey>) throws {
-    let instances = try decodingContainer.decode([T].self, forKey: codingKey)
-    for instance in instances {
-      try proxy.saveIgnoringDelegate(instance)
-    }
-  }
-  
-  override func fetch(proxy: LiteCrate.TransactionProxy, mergedNodes: [Node]) throws -> any Codable {
-    var models = [T]()
-    for node in mergedNodes {
-      models.append(contentsOf: try proxy.fetchIgnoringDelegate(
-        T.self,
-        allWhere: "witness = ? AND timeLastWitnessed >= ?",
-        [node.id, node.time])
-      )
-    }
-    return models
   }
   
   /// If it exists, get the dot corresponding to the model with the same id and not null.

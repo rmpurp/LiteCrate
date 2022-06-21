@@ -95,13 +95,13 @@ class ReplicationController: LiteCrateDelegate {
     let encoder = JSONEncoder()
     encoder.userInfo[CodingUserInfoKey(rawValue: "replicator")!] = self
     encoder.userInfo[CodingUserInfoKey(rawValue: "nodes")!] = clocks
-    return try String(data: encoder.encode(CodableProxy()), encoding: .utf8)!
+    return try String(data: encoder.encode(ReplicationPayload()), encoding: .utf8)!
   }
   
   func decode(from json: String) throws {
     let decoder = JSONDecoder()
     decoder.userInfo[CodingUserInfoKey(rawValue: "replicator")!] = self
-    _ = try decoder.decode(CodableProxy.self, from: json.data(using: .utf8)!)
+    _ = try decoder.decode(ReplicationPayload.self, from: json.data(using: .utf8)!)
   }
   
   func merge(_ otherDB: ReplicationController) throws {
