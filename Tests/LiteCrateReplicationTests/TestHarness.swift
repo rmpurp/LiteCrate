@@ -96,12 +96,16 @@ struct Merge: TestAction {
   let toID: Int
   let debugValue: Int
   let payloadValues: [Int64]?
+  let file: StaticString
+  let line: UInt
 
-  init(fromID: Int, toID: Int, debugValue: Int = -1, payloadValues: [Int64]? = nil) {
+  init(fromID: Int, toID: Int, debugValue: Int = -1, payloadValues: [Int64]? = nil, file: StaticString = #filePath, line: UInt = #line) {
     self.fromID = fromID
     self.toID = toID
     self.debugValue = debugValue
     self.payloadValues = payloadValues
+    self.file = file
+    self.line = line
   }
   
   func perform(_ harness: TestHarness) throws {
@@ -130,18 +134,23 @@ struct Verify: TestAction {
   let databaseID: Int
   let values: [Int64]
   let debugValue: Int
+  let file: StaticString
+  let line: UInt
 
-  init(databaseID: Int, values: [Int64], debugValue: Int = -1) {
+
+  init(databaseID: Int, values: [Int64], debugValue: Int = -1, file: StaticString = #filePath, line: UInt = #line) {
     self.databaseID = databaseID
     self.values = values
     self.debugValue = debugValue
+    self.file = file
+    self.line = line
   }
   
   func perform(_ harness: TestHarness) throws {
     print("Verifying \(databaseID) contains \(values)")
     try harness.databases[databaseID]!.inTransaction { proxy in
       let actualValues = try proxy.fetch(TestModel.self).map(\.value)
-      XCTAssertEqual(values.sorted(), actualValues.sorted())
+      XCTAssertEqual(values.sorted(), actualValues.sorted(), file: self.file, line: self.line)
     }
   }
   
@@ -158,10 +167,19 @@ struct TestBuilder {
 class TestHarness {
   var databases = [Int: ReplicationController]()
   var idMap = [Int: UUID]()
+  var actions: [TestAction]
+  init(@TestBuilder actions: () -> [TestAction]) {
+    self.actions = actions()
+  }
   
-  init(@TestBuilder actions: () -> [TestAction]) throws {
-    for action in actions() {
+  func run() throws {
+    for action in actions {
       try action.perform(self)
     }
   }
+}
+
+func testActions(@TestBuilder actions: () -> [TestAction]) throws {
+  let harness = TestHarness(actions: actions)
+  try harness.run()
 }

@@ -5,7 +5,7 @@
 //  Created by Ryan Purpura on 6/17/22.
 //
 
-import Foundation
+import Foundation 
 
 class CodableProxy: Codable {
   init() {}
@@ -18,8 +18,8 @@ class CodableProxy: Codable {
     let container = try decoder.container(keyedBy: TableNameCodingKey.self)
 
     try replicator.inTransaction { proxy in
-      for replicationTable in replicator.replicatingTables {
-        try replicationTable.populate(proxy: proxy, decodingContainer: container)
+      for instance in replicator.replicatingTables {
+        try instance.replicatingTable().populate(proxy: proxy, decodingContainer: container)
       }
 
       let localNodes = try proxy.fetch(Node.self)
@@ -49,7 +49,8 @@ class CodableProxy: Codable {
 
       let nodes = Node.mergeForEncoding(localNodes: localNodes, remoteNodes: remoteNodes)
       
-      for replicatingTable in db.replicatingTables {
+      for instance in db.replicatingTables {
+        let replicatingTable = instance.replicatingTable()
         try container.encode(replicatingTable.fetch(proxy: proxy, mergedNodes: nodes),
                              forKey: replicatingTable.codingKey)
       }

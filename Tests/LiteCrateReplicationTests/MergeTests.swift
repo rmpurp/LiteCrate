@@ -1,128 +1,81 @@
 //
-//  MergeTests.swift
+//  OverallTests.swift
 //  
 //
-//  Created by Ryan Purpura on 6/19/22.
+//  Created by Ryan Purpura on 6/20/22.
 //
 
 import XCTest
-@testable import LiteCrateReplication
 @testable import LiteCrate
-
-fileprivate struct Boss: ReplicatingModel, Hashable {
-  var age: Int64
-  var dot: Dot = Dot()
-  
-  func hash(into hasher: inout Hasher) {
-    hasher.combine(dot.id)
-  }
-}
-
-extension UUID {
-  var short: String {
-    let hyphen = uuidString.firstIndex(of: "-")!
-    return String(uuidString[..<hyphen])
-  }
-}
-
-extension Boss: CustomDebugStringConvertible {
-  var debugDescription: String {
-    return "Boss(age:\(age), dot: \(dot)"
-  }
-}
+@testable import LiteCrateReplication
 
 final class MergeTests: XCTestCase {
-  func testOneWayMerge() throws {
-    let db1 = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-      CreateReplicatingTable(Boss(age: 0))
-    }
-    
-    let db2 = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-      CreateReplicatingTable (Boss(age: 0))
-    }
-    
-    var bosses: Set<Boss> = []
-    
-    try db1.inTransaction { proxy in
-      try proxy.save(Boss(age: 25))
-      try proxy.save(Boss(age: 30))
-      bosses = try bosses.union(proxy.fetch(Boss.self))
-    }
-    
-    try db2.merge(db1)
-    var db2Bosses: Set<Boss> = []
-
-    try db2.inTransaction { proxy in
-      db2Bosses = try db2Bosses.union(proxy.fetch(Boss.self))
-    }
-    XCTAssertEqual(bosses.count, 2)
-    XCTAssertEqual(bosses, db2Bosses)
-  }
   
-  func testOneWayMergeWithDelete() throws {
-    let db1 = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-      CreateReplicatingTable(Boss(age: 0))
-    }
-    
-    let db2 = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-      CreateReplicatingTable (Boss(age: 0))
-    }
+    func testMerge() throws {
+      try testActions {
+        CreateDatabase(databaseID: 0)
+        Add(databaseID: 0, value: 0)
+        Add(databaseID: 0, value: 1)
+        Verify(databaseID: 0, values: [0, 1])
         
-    try db1.inTransaction { proxy in
-      try proxy.save(Boss(age: 25))
-      try proxy.save(Boss(age: 30))
-      try proxy.save(Boss(age: 35))
-    }
-    
-    try db2.merge(db1)
-    
-    var expected = Set<Boss>()
-    
-    try db1.inTransaction { proxy in
-      let boss = try proxy.fetch(Boss.self, allWhere: "age = 25").first!
-      try proxy.delete(boss)
-      expected = expected.union(try proxy.fetch(Boss.self))
-    }
-    
-    try db2.merge(db1)
+        CreateDatabase(databaseID: 1)
+        Merge(fromID: 0, toID: 1, payloadValues: [0, 1])
+        Verify(databaseID: 1, values: [0, 1])
 
-    try db2.inTransaction { proxy in
-      let actual = Set(try proxy.fetch(Boss.self))
-      XCTAssertEqual(expected, actual)
-      XCTAssertEqual(2, actual.count)
-    }
-  }
-  
-  func testDelta() throws {
-    let db1 = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-      CreateReplicatingTable(Boss(age: 0))
-    }
-    
-    try db1.inTransaction { proxy in
-      try proxy.save(Boss(age: 25))
-    }
+        Add(databaseID: 1, value: 2)
+        Add(databaseID: 1, value: 3)
+        Delete(databaseID: 1, value: 0)
+        Verify(databaseID: 1, values: [1, 2, 3])
+        
+        Merge(fromID: 1, toID: 0, payloadValues: [0, 2, 3])
+        Verify(databaseID: 0, values: [1, 2, 3])
 
-    try db1.inTransaction { proxy in
-      try proxy.save(Boss(age: 30))
-    }
-    
-    let test = { clock, expectedCount in
-      let db2 = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-        CreateReplicatingTable(Boss(age: 0))
+        Add(databaseID: 0, value: 4)
+        Modify(databaseID: 0, oldValue: 1, newValue: 5)
+        Verify(databaseID: 0, values: [2, 3, 4, 5])
+        Add(databaseID: 1, value: 6)
+        Add(databaseID: 1, value: 7)
+        Delete(databaseID: 1, value: 2)
+        Verify(databaseID: 1, values: [1, 3, 6, 7])
+        Merge(fromID: 1, toID: 0, debugValue: 2, payloadValues: [2, 6, 7])
+        Verify(databaseID: 0, values: [3, 4, 5, 6, 7])
+        Merge(fromID: 0, toID: 1, payloadValues: [4, 5])
+        Verify(databaseID: 1, values: [3, 4, 5, 6, 7])
+        
+        Add(databaseID: 0, value: 10, id: 0)
+        Add(databaseID: 1, value: 11)
+        Add(databaseID: 1, value: 12, id: 0)
+        Verify(databaseID: 0, values: [3, 4, 5, 6, 7, 10])
+        Verify(databaseID: 1, values: [3, 4, 5, 6, 7, 11, 12])
+        Merge(fromID: 0, toID: 1, debugValue: 1, payloadValues: [10])
+        Verify(databaseID: 1, values: [3, 4, 5, 6, 7, 11, 12])
+        Merge(fromID: 1, toID: 0, payloadValues: [10, 11, 12])
+        Verify(databaseID: 0, values: [3, 4, 5, 6, 7, 11, 12])
+        
+        // Test modifying a value in two places. The "newest" update wins.
+        Modify(databaseID: 0, oldValue: 3, newValue: 100)
+        Modify(databaseID: 1, oldValue: 4, newValue: 101)
+        Modify(databaseID: 1, oldValue: 3, newValue: 102)
+        Verify(databaseID: 0, values: [4, 5, 6, 7, 11, 12, 100])
+        Verify(databaseID: 1, values: [5, 6, 7, 11, 12, 101, 102])
+        Merge(fromID: 1, toID: 0)
+        Verify(databaseID: 0, values: [5, 6, 7, 11, 12, 101, 102])
+        Merge(fromID: 0, toID: 1)
+        Verify(databaseID: 1, values: [5, 6, 7, 11, 12, 101, 102])
+        
+        // Test one replica deleting, the other modifying. The delete wins.
+        Modify(databaseID: 0, oldValue: 5, newValue: 200)
+        Modify(databaseID: 0, oldValue: 6, newValue: 201)
+        Modify(databaseID: 0, oldValue: 7, newValue: 202)
+        Verify(databaseID: 0, values: [11, 12, 101, 102, 200, 201, 202])
+        Delete(databaseID: 1, value: 6)
+        Delete(databaseID: 1, value: 5)
+        Delete(databaseID: 1, value: 7)
+        Verify(databaseID: 1, values: [11, 12, 101, 102])
+        Merge(fromID: 0, toID: 1, debugValue: 100, payloadValues: [200, 201, 202])
+        Verify(databaseID: 1, values: [11, 12, 101, 102])
+        Merge(fromID: 1, toID: 0, payloadValues: [5, 6, 7])
+        Verify(databaseID: 1, values: [11, 12, 101, 102])
       }
-      
-      let payload = try db1.encode(clocks: [Node(id: db1.nodeID, minTime: 0, time: clock)])
-      try db2.decode(from: payload)
-      
-      try db2.inTransaction { proxy in
-        let bosses = try proxy.fetch(Boss.self)
-        XCTAssertEqual(bosses.count, expectedCount)
-      }
     }
-    
-    try test(0, 2)
-    try test(1, 1)
-    try test(2, 0)
-    try test(3, 0)
-  }
 }

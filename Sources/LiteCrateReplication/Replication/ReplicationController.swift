@@ -14,7 +14,7 @@ class ReplicationController: LiteCrateDelegate {
 
   private var needToIncrementTime = false
 
-  var replicatingTables = Set<ReplicatingTable>()
+  var replicatingTables = [any ReplicatingModel]()
   var nodeID: UUID
   var time: Int64!
   
@@ -110,7 +110,8 @@ class ReplicationController: LiteCrateDelegate {
 
     try inTransaction { [unowned self] localProxy in
       try otherDB.inTransaction { [unowned self] remoteProxy in
-        for table in replicatingTables {
+        for instance in replicatingTables {
+          let table = instance.replicatingTable()
           try table.merge(nodeID: nodeID, time: time, localProxy: localProxy, remoteProxy: remoteProxy)
         }
         

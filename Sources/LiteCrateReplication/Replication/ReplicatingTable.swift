@@ -56,7 +56,7 @@ public static func == (lhs: ReplicatingTable, rhs: ReplicatingTable) -> Bool {
 
 // TODO Change DatabaseCodable
 class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
-  init(_ type: T.Type) {
+  init(_ instance: T) {
     super.init(tableName: T.tableName)
   }
   
@@ -81,11 +81,19 @@ class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
   
   /// If it exists, get the dot corresponding to the model with the same id and not null.
   func getActiveWithSameID(proxy: LiteCrate.TransactionProxy, dot: Dot) throws -> T? {
-    return try proxy.fetch(T.self, allWhere: "timeLastModified IS NOT NULL AND id = ?", [dot.id]).first
+    return try proxy.fetchIgnoringDelegate(T.self, allWhere: "timeLastModified IS NOT NULL AND id = ?", [dot.id]).first
   }
   
   func getWithSameVersion(proxy: LiteCrate.TransactionProxy, dot: Dot) throws -> T? {
-    return try proxy.fetch(T.self, with: dot.version)
+    return try proxy.fetchIgnoringDelegate(T.self, with: dot.version)
+  }
+  
+  func knownToHaveBeenDeleted(localNodes: [UUID: Node], dot: Dot) -> Bool {
+    if let creator = localNodes[dot.creator] {
+      return dot.timeCreated < creator.minTime
+    }
+    
+    return false
   }
   
   
@@ -100,23 +108,31 @@ class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
         // This has been deleted.
         continue
       }
-      
-      // If new version, just insert it.
-      // If existing version, replace with remote model if remote is newer.
-      // Get the version created most recently and delete competing versions.
-      guard let localModel = try getActiveWithSameID(proxy: localProxy, dot: remoteModel.dot) else {
-        try localProxy.saveIgnoringDelegate(remoteModel)
-        continue
-      }
-      
+
+      // If exact version exists locally, replace with remote model iff remote is newer.
+      //    Recall that deletions are always "newer"
       if let sameVersionLocalModel = try getWithSameVersion(proxy: localProxy, dot: remoteModel.dot) {
         if sameVersionLocalModel.dot < remoteModel.dot {
           try localProxy.saveIgnoringDelegate(remoteModel)
         }
-      } else {
-        // LocalModel with different id exists, but this is a new version.
-        try localProxy.saveIgnoringDelegate(remoteModel)
+        continue
       }
+
+
+      // Get the version created most recently and delete competing versions.
+      guard let localModel = try getActiveWithSameID(proxy: localProxy, dot: remoteModel.dot) else {
+        // TODO: If local dot does not exist, but we "would have known about it", then
+        // consider it deleted.
+        if !knownToHaveBeenDeleted(localNodes: nodeDict, dot: remoteModel.dot) {
+          try localProxy.saveIgnoringDelegate(remoteModel)
+        }
+        
+        continue
+      }
+      
+      // This is a new version.
+      try localProxy.saveIgnoringDelegate(remoteModel)
+
       
       if localModel.dot < remoteModel.dot {
         try remoteModel.deleteCompetingModels(localProxy, time: time, node: nodeID)
@@ -124,5 +140,11 @@ class ReplicatingTableImpl<T: ReplicatingModel>: ReplicatingTable {
         try localModel.deleteCompetingModels(localProxy, time: time, node: nodeID)
       }
     }
+  }
+}
+
+extension ReplicatingModel {
+  func replicatingTable() -> ReplicatingTable {
+    return ReplicatingTableImpl(self)
   }
 }
