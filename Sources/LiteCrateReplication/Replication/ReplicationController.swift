@@ -11,10 +11,10 @@ import LiteCrateCore
 
 class ReplicationController: LiteCrateDelegate {
   private var liteCrate: LiteCrate! = nil
-
+  
   private var needToIncrementTime = false
-
-  var replicatingTables = Set<ReplicatingTable>()
+  
+  var replicatingTables = [any ReplicatingModel]()
   var nodeID: UUID
   var time: Int64!
   
@@ -68,7 +68,7 @@ class ReplicationController: LiteCrateDelegate {
       }
       needToIncrementTime = true
       model.dot.update(modifiedBy: nodeID, at: time)
-
+      
       return model as! T
     }
     return model
@@ -89,40 +89,6 @@ class ReplicationController: LiteCrateDelegate {
       clocks = try proxy.fetch(Node.self)
     }
     return clocks
-  }
-  
-  func encode(clocks: [Node]) throws -> String {
-    let encoder = JSONEncoder()
-    encoder.userInfo[CodingUserInfoKey(rawValue: "replicator")!] = self
-    encoder.userInfo[CodingUserInfoKey(rawValue: "nodes")!] = clocks
-    return try String(data: encoder.encode(CodableProxy()), encoding: .utf8)!
-  }
-  
-  func decode(from json: String) throws {
-    let decoder = JSONDecoder()
-    decoder.userInfo[CodingUserInfoKey(rawValue: "replicator")!] = self
-    _ = try decoder.decode(CodableProxy.self, from: json.data(using: .utf8)!)
-  }
-  
-  func merge(_ otherDB: ReplicationController) throws {
-    assert(otherDB !== self)
-    
-
-    try inTransaction { [unowned self] localProxy in
-      try otherDB.inTransaction { [unowned self] remoteProxy in
-        for table in replicatingTables {
-          try table.merge(nodeID: nodeID, time: time, localProxy: localProxy, remoteProxy: remoteProxy)
-        }
-        
-        let localNodes = try localProxy.fetch(Node.self)
-        let remoteNodes = try remoteProxy.fetch(Node.self)
-        for node in Node.mergeForDecoding(nodeID: nodeID, localNodes: localNodes, remoteNodes: remoteNodes) {
-          try localProxy.saveIgnoringDelegate(node)
-        }
-        
-//        assert(!needToIncrementTime)
-      }
-    }
   }
 }
 
