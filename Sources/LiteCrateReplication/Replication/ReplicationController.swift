@@ -135,28 +135,6 @@ class ReplicationController: LiteCrateDelegate {
       }
     
   }
-  
-  func merge(_ otherDB: ReplicationController) throws {
-    assert(otherDB !== self)
-    
-
-    try inTransaction { [unowned self] localProxy in
-      try otherDB.inTransaction { [unowned self] remoteProxy in
-        for instance in replicatingTables {
-          let table = instance.replicatingTable()
-          try table.merge(nodeID: nodeID, time: time, localProxy: localProxy, remoteProxy: remoteProxy)
-        }
-        
-        let localNodes = try localProxy.fetch(Node.self)
-        let remoteNodes = try remoteProxy.fetch(Node.self)
-        for node in Node.mergeForDecoding(nodeID: nodeID, localNodes: localNodes, remoteNodes: remoteNodes) {
-          try localProxy.saveIgnoringDelegate(node)
-        }
-        
-//        assert(!needToIncrementTime)
-      }
-    }
-  }
 }
 
 // Extension because generic sadness
