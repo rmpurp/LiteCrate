@@ -8,6 +8,20 @@
 import Foundation 
 import LiteCrate
 
+struct TableNameCodingKey: CodingKey {
+  var stringValue: String
+  
+  init(stringValue: String) {
+    self.stringValue = stringValue
+  }
+  
+  var intValue: Int? = nil
+  
+  init?(intValue: Int) {
+    return nil
+  }
+}
+
 class ReplicationPayload: Codable {
   var models = [String: [any ReplicatingModel]]()
   var nodes = [Node]()

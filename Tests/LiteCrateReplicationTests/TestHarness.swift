@@ -122,7 +122,7 @@ struct Merge: TestAction {
       XCTAssertEqual(payloadValues.sorted(), actual.sorted(), file: file, line: line)
     }
     
-    try harness.databases[toID]!.merge2(payload)
+    try harness.databases[toID]!.merge(payload)
     
   }
 }
