@@ -114,7 +114,7 @@ struct Merge: TestAction {
   func perform(_ harness: TestHarness) throws {
     print("Merging \(fromID) to \(toID)")
     let clocks = try harness.databases[toID]!.clocks()
-    let payload = try harness.databases[fromID]!.encode(clocks: clocks)
+    let payload = try harness.databases[fromID]!.payload(remoteNodes: clocks)
     print("Payload: \(payload)")
 
     if let payloadValues {

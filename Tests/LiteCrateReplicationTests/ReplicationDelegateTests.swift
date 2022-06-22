@@ -72,7 +72,7 @@ final class ReplicationDelegateTests: XCTestCase {
         try proxy.save(Employee(id: UUID(), name: "bob"))
       }
       
-      let json = try crate.encode(clocks: [])
+      let json = try crate.payload(remoteNodes: [])
       
       
       let crate2 = try ReplicationController(location: ":memory:", nodeID: UUID()) {
@@ -83,7 +83,7 @@ final class ReplicationDelegateTests: XCTestCase {
       }
       
 //      try crate2.decode(from: json)
-      try print(crate2.encode(clocks: []))
+      try print(crate2.payload(remoteNodes: []))
 
       
 //      let j = JSONEncoder()
