@@ -82,7 +82,7 @@ final class ReplicationDelegateTests: XCTestCase {
         }
       }
       
-      try crate2.decode(from: json)
+//      try crate2.decode(from: json)
       try print(crate2.encode(clocks: []))
 
       

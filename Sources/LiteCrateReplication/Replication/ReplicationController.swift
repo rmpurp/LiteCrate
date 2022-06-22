@@ -91,17 +91,49 @@ class ReplicationController: LiteCrateDelegate {
     return clocks
   }
   
-  func encode(clocks: [Node]) throws -> String {
-    let encoder = JSONEncoder()
-    encoder.userInfo[CodingUserInfoKey(rawValue: "replicator")!] = self
-    encoder.userInfo[CodingUserInfoKey(rawValue: "nodes")!] = clocks
-    return try String(data: encoder.encode(ReplicationPayload()), encoding: .utf8)!
+  func encode(clocks: [Node]) throws -> ReplicationPayload {
+    var models = [String: [any ReplicatingModel]]()
+    var localNodes = [Node]()
+    try inTransaction { [unowned self] proxy in
+      localNodes.append(contentsOf: try proxy.fetch(Node.self))
+      var nodesForFetching = Node.mergeForEncoding(localNodes: localNodes, remoteNodes: clocks)
+
+      for exampleInstance in replicatingTables {
+        models[exampleInstance.tableName] = try fetch(instance: exampleInstance, proxy: proxy, nodes: nodesForFetching)
+      }
+    }
+    return ReplicationPayload(models: models, nodes: localNodes)
   }
+  
+//  func encode(clocks: [Node]) throws -> String {
+//    let encoder = JSONEncoder()
+//    encoder.userInfo[CodingUserInfoKey(rawValue: "replicator")!] = self
+//    encoder.userInfo[CodingUserInfoKey(rawValue: "nodes")!] = clocks
+//    return try String(data: encoder.encode(ReplicationPayload()), encoding: .utf8)!
+//  }
   
   func decode(from json: String) throws {
     let decoder = JSONDecoder()
-    decoder.userInfo[CodingUserInfoKey(rawValue: "replicator")!] = self
+//    decoder.userInfo[CodingUserInfoKey(rawValue: "replicator")!] = self
+    
     _ = try decoder.decode(ReplicationPayload.self, from: json.data(using: .utf8)!)
+  }
+  
+  func merge2(_ payload: ReplicationPayload) throws {
+    try inTransaction { [unowned self] localProxy in
+        for instance in replicatingTables {
+          let table = instance.replicatingTable()
+          try table.merge2(nodeID: nodeID, time: time, localProxy: localProxy, payload: payload)
+        }
+        
+      let localNodes = try localProxy.fetch(Node.self)
+      for node in Node.mergeForDecoding(nodeID: nodeID, localNodes: localNodes, remoteNodes: payload.nodes) {
+        try localProxy.saveIgnoringDelegate(node)
+      }
+        
+        //        assert(!needToIncrementTime)
+      }
+    
   }
   
   func merge(_ otherDB: ReplicationController) throws {

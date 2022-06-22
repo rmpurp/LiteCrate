@@ -84,7 +84,10 @@ struct Modify: TestAction {
   func perform(_ harness: TestHarness) throws {
     print("Modifying \(oldValue) int database \(databaseID) to \(newValue)")
     try harness.databases[databaseID]!.inTransaction { proxy in
-      var model = try proxy.fetch(TestModel.self, allWhere: "value = ?", [oldValue]).first!
+      guard var model = try proxy.fetch(TestModel.self, allWhere: "value = ?", [oldValue]).first else {
+        XCTFail()
+        return
+      }
       model.value = newValue
       try proxy.save(model)
     }
@@ -113,20 +116,14 @@ struct Merge: TestAction {
     let clocks = try harness.databases[toID]!.clocks()
     let payload = try harness.databases[fromID]!.encode(clocks: clocks)
     print("Payload: \(payload)")
-    let tempDB = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-      CreateReplicatingTable(TestModel(value: 0))
-    }
 
-    try tempDB.decode(from: payload)
-    
     if let payloadValues {
-      try tempDB.inTransaction { proxy in
-        let actual = try proxy.fetchIgnoringDelegate(TestModel.self).map(\.value)
-        XCTAssertEqual(payloadValues.sorted(), actual.sorted())
-      }
+      let actual = payload.models[TestModel.tableName]!.map { ($0 as! TestModel).value }
+      XCTAssertEqual(payloadValues.sorted(), actual.sorted(), file: file, line: line)
     }
     
-    try harness.databases[toID]!.merge(tempDB)
+    try harness.databases[toID]!.merge2(payload)
+    
   }
 }
 
