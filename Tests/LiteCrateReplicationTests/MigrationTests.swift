@@ -30,7 +30,7 @@ final class MigrationTests: XCTestCase {
       }
     }
 
-    XCTAssertEqual(controller.replicatingTables.count, 2)
+    XCTAssertEqual(controller.exampleInstances.count, 2)
     // TODO:
   }
 //

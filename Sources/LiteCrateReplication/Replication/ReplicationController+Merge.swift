@@ -16,7 +16,7 @@ extension ReplicationController {
       localNodes.append(contentsOf: try proxy.fetch(Node.self))
       let nodesForFetching = Node.mergeForEncoding(localNodes: localNodes, remoteNodes: remoteNodes)
 
-      for exampleInstance in replicatingTables {
+      for exampleInstance in exampleInstances {
         models[exampleInstance.tableName] = try fetch(instance: exampleInstance, proxy: proxy, nodes: nodesForFetching)
       }
     }
@@ -25,7 +25,7 @@ extension ReplicationController {
 
   public func merge(_ payload: ReplicationPayload) throws {
     try inTransaction { [unowned self] localProxy in
-      for instance in replicatingTables {
+      for instance in exampleInstances {
         try merge(model: instance, nodeID: nodeID, time: time, localProxy: localProxy, payload: payload)
       }
 

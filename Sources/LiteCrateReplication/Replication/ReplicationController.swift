@@ -14,9 +14,13 @@ class ReplicationController: LiteCrateDelegate {
 
   private var needToIncrementTime = false
 
-  var replicatingTables = [any ReplicatingModel]()
+  var exampleInstances = [any ReplicatingModel]()
   var nodeID: UUID
   var time: Int64!
+
+  var userInfo: [CodingUserInfoKey: Any] {
+    [.init(rawValue: "instances")!: exampleInstances]
+  }
 
   init(location: String, nodeID: UUID, @MigrationBuilder migrations: () -> Migration) throws {
     self.nodeID = nodeID
@@ -40,7 +44,7 @@ class ReplicationController: LiteCrateDelegate {
 
   func migration<A>(willRun action: A) where A: MigrationAction {
     if let action = action as? ReplicatingTableMigrationAction {
-      action.modifyReplicatingTables(&replicatingTables)
+      action.modifyReplicatingTables(&exampleInstances)
     }
   }
 
