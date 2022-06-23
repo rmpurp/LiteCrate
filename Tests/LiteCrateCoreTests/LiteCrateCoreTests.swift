@@ -1,5 +1,5 @@
-import XCTest
 @testable import LiteCrateCore
+import XCTest
 
 final class LiteCrateCoreTests: XCTestCase {
   func testExample() throws {

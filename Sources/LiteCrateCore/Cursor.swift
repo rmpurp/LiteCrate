@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 6/12/22.
 //
@@ -28,7 +28,7 @@ public class Cursor {
     guard columnCount > 0 else { return [:] }
 
     var columnToIndexDictionary = [String: Int32]()
-    for i in 0..<columnCount {
+    for i in 0 ..< columnCount {
       let name = String(cString: sqlite3_column_name(statement, i))
       columnToIndexDictionary[name] = i
     }
@@ -83,7 +83,7 @@ public class Cursor {
   }
 
   public func bool(for index: Int32) -> Bool {
-    return int(for: index) == 0 ? false : true
+    int(for: index) == 0 ? false : true
   }
 
   public func data(for index: Int32) -> Data {

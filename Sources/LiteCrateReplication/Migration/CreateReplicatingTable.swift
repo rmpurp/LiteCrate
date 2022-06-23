@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 6/16/22.
 //
@@ -19,11 +19,11 @@ public struct CreateReplicatingTable<T: ReplicatingModel>: ReplicatingTableMigra
     creationStatement = instance.creationStatement
     self.instance = instance
   }
-  
+
   public func perform(in proxy: LiteCrate.TransactionProxy) throws {
     try proxy.execute(creationStatement)
   }
-  
+
   public func modifyReplicatingTables(_ replicatingTables: inout [any ReplicatingModel]) {
     replicatingTables.append(instance)
   }

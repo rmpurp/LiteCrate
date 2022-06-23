@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 6/12/22.
 //
@@ -8,17 +8,17 @@
 import Foundation
 import XCTest
 
-@testable import LiteCrateReplication
 @testable import LiteCrate
+@testable import LiteCrateReplication
 
-fileprivate struct Employee: ReplicatingModel {
+private struct Employee: ReplicatingModel {
   var name: String
-  var dot: Dot = Dot()
+  var dot: Dot = .init()
 }
 
-fileprivate struct Boss: ReplicatingModel {
+private struct Boss: ReplicatingModel {
   var rank: Int64
-  var dot: Dot = Dot()
+  var dot: Dot = .init()
 }
 
 final class MigrationTests: XCTestCase {
@@ -29,12 +29,12 @@ final class MigrationTests: XCTestCase {
         CreateReplicatingTable(Boss(rank: 0))
       }
     }
-    
+
     XCTAssertEqual(controller.replicatingTables.count, 2)
-    // TODO: 
+    // TODO:
   }
 //
-//  func testPayload() throws {
+  //  func testPayload() throws {
 //    let crate = try LiteCrate(":memory:", nodeID: UUID()) {
 //      MigrationStep {
 //        CreateReplicatingTable(Employee(id: UUID(), name: ""))
@@ -68,6 +68,6 @@ final class MigrationTests: XCTestCase {
 //      print(try proxy.fetch(Employee.self))
 //    }
 //
-    // TODO: write proper test
-//  }
+  // TODO: write proper test
+  //  }
 }

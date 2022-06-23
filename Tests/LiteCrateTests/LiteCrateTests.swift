@@ -6,7 +6,7 @@ import SQLite3
 
 extension DispatchSemaphore {
   func waitABit() -> DispatchTimeoutResult {
-    return wait(timeout: DispatchTime.now().advanced(by: .seconds(1)))
+    wait(timeout: DispatchTime.now().advanced(by: .seconds(1)))
   }
 }
 
@@ -29,7 +29,7 @@ final class LiteCrateTests: XCTestCase {
       try proxy.save(person)
     }
 
-    var reached: Bool = false
+    var reached = false
 
     try crate.inTransaction { proxy in
       guard let fetchedPerson = try proxy.fetch(Person.self, with: person.id) else {

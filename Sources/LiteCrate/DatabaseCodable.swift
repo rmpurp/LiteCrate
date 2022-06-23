@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 6/12/22.
 //
@@ -13,7 +13,7 @@ public protocol DatabaseCodable<Key>: Codable {
   static var tableName: String { get }
   var tableName: String { get }
   static var foreignKeys: [ForeignKey] { get }
-  static var primaryKeyColumn: String {get}
+  static var primaryKeyColumn: String { get }
   var primaryKeyValue: Key { get }
 }
 
@@ -25,7 +25,7 @@ public extension DatabaseCodable {
 
   var creationStatement: String {
     let encoder = SchemaEncoder()
-    try! self.encode(to: encoder)
+    try! encode(to: encoder)
 
     let opening = "CREATE TABLE \(Self.tableName) (\n"
     var components = [String]()
@@ -40,13 +40,13 @@ public extension DatabaseCodable {
     components.append(contentsOf: sortedColumns.map { "\($0) \($1.rawValue)" })
     components.append("PRIMARY KEY (\(Self.primaryKeyColumn))")
     components.append(contentsOf: Self.foreignKeys.map(\.creationStatement))
-    return opening + components.map {"    " + $0}.joined(separator: ",\n") + ending
+    return opening + components.map { "    " + $0 }.joined(separator: ",\n") + ending
   }
 }
 
 public extension DatabaseCodable where Self: Identifiable, ID == Key {
   static var primaryKeyColumn: String { "id" }
-   var primaryKeyValue: Key { id }
+  var primaryKeyValue: Key { id }
 }
 
 public struct ForeignKey {
@@ -81,6 +81,6 @@ public struct ForeignKey {
   }
 
   fileprivate var creationStatement: String {
-    return "FOREIGN KEY (\(columnName)) REFERENCES \(targetTable)(\(targetColumn)) ON DELETE \(onDelete.clause)"
+    "FOREIGN KEY (\(columnName)) REFERENCES \(targetTable)(\(targetColumn)) ON DELETE \(onDelete.clause)"
   }
 }

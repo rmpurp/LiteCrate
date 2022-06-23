@@ -8,7 +8,7 @@
 import Foundation
 
 func lc_log(_ format: String, _ args: CVarArg...) {
-#if DEBUG
-  NSLog("LiteCrate: " + format, args)
-#endif
+  #if DEBUG
+    NSLog("LiteCrate: " + format, args)
+  #endif
 }

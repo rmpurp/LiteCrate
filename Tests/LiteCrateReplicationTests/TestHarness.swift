@@ -1,28 +1,27 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 6/20/22.
 //
 
 import Foundation
-import XCTest
 @testable import LiteCrate
 @testable import LiteCrateReplication
+import XCTest
 
 protocol TestAction {
   func perform(_ harness: TestHarness) throws
 }
 
-
 struct TestModel: ReplicatingModel {
   var value: Int64
-  var dot: Dot = Dot()
+  var dot: Dot = .init()
 }
 
 struct CreateDatabase: TestAction {
   let databaseID: Int
-  
+
   func perform(_ harness: TestHarness) throws {
     print("Creating database with id \(databaseID)")
     harness.databases[databaseID] = try ReplicationController(location: ":memory:", nodeID: UUID()) {
@@ -35,13 +34,13 @@ struct Add: TestAction {
   let databaseID: Int
   let value: Int64
   let id: Int?
-  
+
   init(databaseID: Int, value: Int64, id: Int? = nil) {
     self.databaseID = databaseID
     self.value = value
     self.id = id
   }
-  
+
   func perform(_ harness: TestHarness) throws {
     print("Adding \(value) to database \(databaseID)")
     try harness.databases[databaseID]!.inTransaction { proxy in
@@ -63,7 +62,7 @@ struct Add: TestAction {
 struct Delete: TestAction {
   let databaseID: Int
   let value: Int64
-  
+
   func perform(_ harness: TestHarness) throws {
     print("Deleting \(value) from database \(databaseID)")
     try harness.databases[databaseID]!.inTransaction { proxy in
@@ -110,7 +109,7 @@ struct Merge: TestAction {
     self.file = file
     self.line = line
   }
-  
+
   func perform(_ harness: TestHarness) throws {
     print("Merging \(fromID) to \(toID)")
     let clocks = try harness.databases[toID]!.clocks()
@@ -121,9 +120,8 @@ struct Merge: TestAction {
       let actual = payload.models[TestModel.tableName]!.map { ($0 as! TestModel).value }
       XCTAssertEqual(payloadValues.sorted(), actual.sorted(), file: file, line: line)
     }
-    
+
     try harness.databases[toID]!.merge(payload)
-    
   }
 }
 
@@ -134,7 +132,6 @@ struct Verify: TestAction {
   let file: StaticString
   let line: UInt
 
-
   init(databaseID: Int, values: [Int64], debugValue: Int = -1, file: StaticString = #filePath, line: UInt = #line) {
     self.databaseID = databaseID
     self.values = values
@@ -142,7 +139,7 @@ struct Verify: TestAction {
     self.file = file
     self.line = line
   }
-  
+
   func perform(_ harness: TestHarness) throws {
     print("Verifying \(databaseID) contains \(values)")
     try harness.databases[databaseID]!.inTransaction { proxy in
@@ -150,15 +147,13 @@ struct Verify: TestAction {
       XCTAssertEqual(values.sorted(), actualValues.sorted(), file: self.file, line: self.line)
     }
   }
-  
 }
 
 @resultBuilder
-struct TestBuilder {
+enum TestBuilder {
   static func buildBlock(_ components: TestAction...) -> [TestAction] {
     components
   }
-  
 }
 
 class TestHarness {
@@ -168,7 +163,7 @@ class TestHarness {
   init(@TestBuilder actions: () -> [TestAction]) {
     self.actions = actions()
   }
-  
+
   func run() throws {
     for action in actions {
       try action.perform(self)

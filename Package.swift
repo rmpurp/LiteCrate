@@ -9,16 +9,18 @@ let package = Package(
     .macOS(.v12),
     .iOS(.v15),
     .watchOS(.v8),
-    .tvOS(.v15)
+    .tvOS(.v15),
   ],
   products: [
     // Products define the executables and libraries a package produces, and make them visible to other packages.
     .library(
       name: "LiteCrate",
-      targets: ["LiteCrate"]),
+      targets: ["LiteCrate"]
+    ),
     .library(
       name: "LiteCrateReplication",
-      targets: ["LiteCrateReplication", "LiteCrate"])
+      targets: ["LiteCrateReplication", "LiteCrate"]
+    ),
   ],
   targets: [
     // Targets are the basic building blocks of a package. A target can define a module or a test suite.
@@ -26,18 +28,21 @@ let package = Package(
     .target(
       name: "LiteCrate",
       dependencies: [
-        .byName(name: "LiteCrateCore")
-      ]),
+        .byName(name: "LiteCrateCore"),
+      ]
+    ),
     .target(
       name: "LiteCrateReplication",
       dependencies: [
-        .byName(name: "LiteCrate")
-      ]),
+        .byName(name: "LiteCrate"),
+      ]
+    ),
     .target(
       name: "LiteCrateCore",
       dependencies: [
-        .byName(name: "sqlite3")
-      ]),
+        .byName(name: "sqlite3"),
+      ]
+    ),
     .target(
       name: "sqlite3",
       dependencies: [],
@@ -55,6 +60,6 @@ let package = Package(
     .testTarget(
       name: "LiteCrateReplicationTests",
       dependencies: ["LiteCrateReplication"]
-    )
+    ),
   ]
 )
