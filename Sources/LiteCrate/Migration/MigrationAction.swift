@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 6/12/22.
 //
@@ -11,9 +11,9 @@ public protocol MigrationAction: MigrationStep {
   func perform(in proxy: LiteCrate.TransactionProxy) throws
 }
 
-extension MigrationAction {
-  public var asGroup: MigrationGroup {
-    return MigrationGroup {
+public extension MigrationAction {
+  var asGroup: MigrationGroup {
+    MigrationGroup {
       self
     }
   }

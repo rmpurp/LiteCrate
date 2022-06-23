@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 2/17/22.
 //
@@ -29,123 +29,123 @@ class SchemaEncoder: Encoder {
     var codingPath: [CodingKey] = []
     let encoder: SchemaEncoder
 
-    func encodeNil(forKey key: Key) throws {
+    func encodeNil(forKey _: Key) throws {
       fatalError()
     }
 
-    func encode(_ value: Bool, forKey key: Key) throws {
+    func encode(_: Bool, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .integer
     }
 
-    func encode(_ value: String, forKey key: Key) throws {
+    func encode(_: String, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .text
     }
 
-    func encode(_ value: Double, forKey key: Key) throws {
+    func encode(_: Double, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .real
     }
 
-    func encode(_ value: Float, forKey key: Key) throws {
+    func encode(_: Float, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .real
     }
 
-    func encode(_ value: Int, forKey key: Key) throws {
+    func encode(_: Int, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .integer
     }
 
-    func encode(_ value: Int8, forKey key: Key) throws {
+    func encode(_: Int8, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .integer
     }
 
-    func encode(_ value: Int16, forKey key: Key) throws {
+    func encode(_: Int16, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .integer
     }
 
-    func encode(_ value: Int32, forKey key: Key) throws {
+    func encode(_: Int32, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .integer
     }
 
-    func encode(_ value: Int64, forKey key: Key) throws {
+    func encode(_: Int64, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .integer
     }
 
-    func encode(_ value: UInt, forKey key: Key) throws {
+    func encode(_: UInt, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .integer
     }
 
-    func encode(_ value: UInt8, forKey key: Key) throws {
+    func encode(_: UInt8, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .integer
     }
 
-    func encode(_ value: UInt16, forKey key: Key) throws {
+    func encode(_: UInt16, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .integer
     }
 
-    func encode(_ value: UInt32, forKey key: Key) throws {
+    func encode(_: UInt32, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .integer
     }
 
-    func encode(_ value: UInt64, forKey key: Key) throws {
+    func encode(_: UInt64, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .integer
     }
 
-    func encodeIfPresent(_ value: Bool?, forKey key: Key) throws {
+    func encodeIfPresent(_: Bool?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableInteger
     }
 
-    func encodeIfPresent(_ value: String?, forKey key: Key) throws {
+    func encodeIfPresent(_: String?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableText
     }
 
-    func encodeIfPresent(_ value: Float?, forKey key: Key) throws {
+    func encodeIfPresent(_: Float?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableReal
     }
 
-    func encodeIfPresent(_ value: Double?, forKey key: Key) throws {
+    func encodeIfPresent(_: Double?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableReal
     }
 
-    func encodeIfPresent(_ value: Int?, forKey key: Key) throws {
+    func encodeIfPresent(_: Int?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableInteger
     }
 
-    func encodeIfPresent(_ value: Int8?, forKey key: Key) throws {
+    func encodeIfPresent(_: Int8?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableInteger
     }
 
-    func encodeIfPresent(_ value: Int16?, forKey key: Key) throws {
+    func encodeIfPresent(_: Int16?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableInteger
     }
 
-    func encodeIfPresent(_ value: Int32?, forKey key: Key) throws {
+    func encodeIfPresent(_: Int32?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableInteger
     }
 
-    func encodeIfPresent(_ value: Int64?, forKey key: Key) throws {
+    func encodeIfPresent(_: Int64?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableInteger
     }
 
-    func encodeIfPresent(_ value: UInt?, forKey key: Key) throws {
+    func encodeIfPresent(_: UInt?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableInteger
     }
 
-    func encodeIfPresent(_ value: UInt8?, forKey key: Key) throws {
+    func encodeIfPresent(_: UInt8?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableInteger
     }
 
-    func encodeIfPresent(_ value: UInt16?, forKey key: Key) throws {
+    func encodeIfPresent(_: UInt16?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableInteger
     }
 
-    func encodeIfPresent(_ value: UInt32?, forKey key: Key) throws {
+    func encodeIfPresent(_: UInt32?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableInteger
     }
 
-    func encodeIfPresent(_ value: UInt64?, forKey key: Key) throws {
+    func encodeIfPresent(_: UInt64?, forKey key: Key) throws {
       encoder.columns[key.stringValue] = .nullableInteger
     }
 
-    func encodeIfPresent<T>(_ value: T?, forKey key: Key) throws where T: Encodable {
+    func encodeIfPresent<T>(_: T?, forKey key: Key) throws where T: Encodable {
       if T.self == Date.self {
         encoder.columns[key.stringValue] = .nullableInteger
       } else if T.self == Data.self {
@@ -173,12 +173,13 @@ class SchemaEncoder: Encoder {
       }
     }
 
-    mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key)
-    -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
+    mutating func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type, forKey _: Key)
+      -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey
+    {
       fatalError()
     }
 
-    mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
+    mutating func nestedUnkeyedContainer(forKey _: Key) -> UnkeyedEncodingContainer {
       fatalError()
     }
 
@@ -186,22 +187,20 @@ class SchemaEncoder: Encoder {
       fatalError()
     }
 
-    mutating func superEncoder(forKey key: Key) -> Encoder {
+    mutating func superEncoder(forKey _: Key) -> Encoder {
       fatalError()
     }
   }
 
-  func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
-    return KeyedEncodingContainer(KEC(encoder: self))
+  func container<Key>(keyedBy _: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
+    KeyedEncodingContainer(KEC(encoder: self))
   }
 
   func unkeyedContainer() -> UnkeyedEncodingContainer {
     fatalError("unkeyed container not allowed")
-
   }
 
   func singleValueContainer() -> SingleValueEncodingContainer {
     fatalError()
   }
-
 }

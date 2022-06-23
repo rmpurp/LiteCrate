@@ -15,26 +15,26 @@ enum LiteCrateError: Error {
 public class LiteCrate {
   private var db: Database
   public var delegate: (any LiteCrateDelegate)?
-  
+
   public init(_ location: String, delegate: (any LiteCrateDelegate)? = nil, @MigrationBuilder migrations: () -> Migration) throws {
-    self.db = try Database(location)
+    db = try Database(location)
     self.delegate = delegate
     try runMigrations(migration: migrations())
   }
-  
+
   private func runMigrations(migration: Migration) throws {
     let proxy = TransactionProxy(db: db, delegate: delegate)
 
     // Don't call delegate transaction method.
     try proxy.db.beginTransaction()
-    
+
     // interpret the current version as "Next migration to run"
     var currentVersion = try proxy.getCurrentSchemaVersion()
     if currentVersion == 0 {
       try delegate?.migration(didInitializeIn: proxy)
       currentVersion = 1
     }
-    
+
     for (i, migration) in migration.steps.enumerated() {
       let step = i + 1
       if step < currentVersion { continue }
@@ -48,16 +48,15 @@ public class LiteCrate {
     try proxy.setCurrentSchemaVersion(version: currentVersion)
     try proxy.db.commit()
   }
-  
-  
+
   public func close() {
     db.close()
   }
-  
+
   @discardableResult
   public func inTransaction<T>(block: (TransactionProxy) throws -> T) throws -> T {
     let proxy = TransactionProxy(db: db, delegate: delegate)
-    
+
     defer { proxy.isEnabled = false }
     defer { delegate?.transactionDidEnd() }
     do {

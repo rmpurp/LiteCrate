@@ -9,7 +9,6 @@ import Foundation
 import LiteCrateCore
 
 class DatabaseEncoder: Encoder {
-
   init(tableName: String) {
     self.tableName = tableName
   }
@@ -61,42 +60,34 @@ class DatabaseEncoder: Encoder {
 
     mutating func encode(_ value: Int8, forKey key: Key) throws {
       encoder.columnToKey[key.stringValue] = Int64(value)
-
     }
 
     mutating func encode(_ value: Int16, forKey key: Key) throws {
       encoder.columnToKey[key.stringValue] = Int64(value)
-
     }
 
     mutating func encode(_ value: Int32, forKey key: Key) throws {
       encoder.columnToKey[key.stringValue] = Int64(value)
-
     }
 
     mutating func encode(_ value: Int64, forKey key: Key) throws {
       encoder.columnToKey[key.stringValue] = value
-
     }
 
     mutating func encode(_ value: UInt, forKey key: Key) throws {
       encoder.columnToKey[key.stringValue] = Int64(value)
-
     }
 
     mutating func encode(_ value: UInt8, forKey key: Key) throws {
       encoder.columnToKey[key.stringValue] = Int64(value)
-
     }
 
     mutating func encode(_ value: UInt16, forKey key: Key) throws {
       encoder.columnToKey[key.stringValue] = Int64(value)
-
     }
 
     mutating func encode(_ value: UInt32, forKey key: Key) throws {
       encoder.columnToKey[key.stringValue] = Int64(value)
-
     }
 
     mutating func encode(_ value: UInt64, forKey key: Key) throws {
@@ -123,12 +114,13 @@ class DatabaseEncoder: Encoder {
       }
     }
 
-    mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key)
-      -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
+    mutating func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type, forKey _: Key)
+      -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey
+    {
       fatalError()
     }
 
-    mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer {
+    mutating func nestedUnkeyedContainer(forKey _: Key) -> UnkeyedEncodingContainer {
       fatalError()
     }
 
@@ -136,22 +128,20 @@ class DatabaseEncoder: Encoder {
       fatalError()
     }
 
-    mutating func superEncoder(forKey key: Key) -> Encoder {
+    mutating func superEncoder(forKey _: Key) -> Encoder {
       fatalError()
     }
   }
 
-  func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
-    return KeyedEncodingContainer(KEC(encoder: self))
+  func container<Key>(keyedBy _: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
+    KeyedEncodingContainer(KEC(encoder: self))
   }
 
   func unkeyedContainer() -> UnkeyedEncodingContainer {
     fatalError("unkeyed container not allowed")
-
   }
 
   func singleValueContainer() -> SingleValueEncodingContainer {
     fatalError()
   }
-
 }

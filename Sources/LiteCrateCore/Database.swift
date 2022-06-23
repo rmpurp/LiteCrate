@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 6/10/22.
 //
@@ -15,9 +15,9 @@ private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.sel
 public enum DatabaseError: Error, CustomDebugStringConvertible {
   public var debugDescription: String {
     switch self {
-    case .error(let msg): fallthrough
-    case .abort(let msg): fallthrough
-    case .unknown(let msg):
+    case let .error(msg): fallthrough
+    case let .abort(msg): fallthrough
+    case let .unknown(msg):
       return msg
     }
   }
@@ -63,13 +63,13 @@ public class Database {
     for (i, parameter) in parameters.enumerated() {
       let columnIndex = Int32(i + 1)
       switch parameter?.asSqliteType {
-      case .integer(let val):
+      case let .integer(val):
         sqlite3_bind_int64(ppStmt, columnIndex, val)
-      case .real(let val):
+      case let .real(val):
         sqlite3_bind_double(ppStmt, columnIndex, val)
-      case .text(let val):
+      case let .text(val):
         sqlite3_bind_text(ppStmt, columnIndex, val, Int32(val.lengthOfBytes(using: .utf8)), SQLITE_TRANSIENT)
-      case .blob(let val):
+      case let .blob(val):
         _ = val.withUnsafeBytes { bufferPointer in
           sqlite3_bind_blob(ppStmt, columnIndex, bufferPointer.baseAddress, Int32(bufferPointer.count), SQLITE_TRANSIENT)
         }
@@ -84,8 +84,8 @@ public class Database {
 
   public func execute(_ statement: String, _ parameters: [SqliteRepresentable?] = []) throws {
     guard !closed else { fatalError("Operating on a closed database.") }
-      let cursor = try query(statement, parameters)
-      _ = try cursor.stepWithError()
+    let cursor = try query(statement, parameters)
+    _ = try cursor.stepWithError()
   }
 
   public func close() {

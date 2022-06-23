@@ -8,24 +8,24 @@
 import Foundation
 import XCTest
 
-@testable import LiteCrateReplication
 @testable import LiteCrate
+@testable import LiteCrateReplication
 
-fileprivate struct Employee: ReplicatingModel, Identifiable {
+private struct Employee: ReplicatingModel, Identifiable {
   var id: UUID
   var name: String
-  var dot: Dot = Dot()
+  var dot: Dot = .init()
 }
 
-fileprivate struct Boss: DatabaseCodable, Identifiable {
+private struct Boss: DatabaseCodable, Identifiable {
   var id: UUID
   var rank: Int64
 }
 
-fileprivate struct Customer: ReplicatingModel, Identifiable {
+private struct Customer: ReplicatingModel, Identifiable {
   var id: UUID
   var orderArrived: Int64
-  var dot: Dot = Dot()
+  var dot: Dot = .init()
 }
 
 final class ReplicationDelegateTests: XCTestCase {
@@ -41,13 +41,13 @@ final class ReplicationDelegateTests: XCTestCase {
       XCTAssertEqual(crate.time, 0)
       try proxy.save(Boss(id: UUID(), rank: 0))
     }
-    
+
     try crate.inTransaction { proxy in
       XCTAssertEqual(crate.time, 0)
       try proxy.save(Employee(id: UUID(), name: "arst"))
     }
-    
-    try crate.inTransaction(block: { proxy in
+
+    try crate.inTransaction(block: { _ in
       XCTAssertEqual(crate.time, 1)
     })
   }

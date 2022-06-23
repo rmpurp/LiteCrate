@@ -9,16 +9,16 @@ import Foundation
 @testable import LiteCrate
 
 struct Person: DatabaseCodable, Identifiable {
-  var id: UUID = UUID()
+  var id: UUID = .init()
   var name: String
   var birthday: Date?
   var dogID: UUID
-//  static var foreignKeys = [ForeignKey("dogID", references: "Dog", targetColumn: "id"), ForeignKey(["catID1", "catID2"], references: "Cat", targetColumns: ["id1", "id2"], onCascadeDelete: true)]
+  //  static var foreignKeys = [ForeignKey("dogID", references: "Dog", targetColumn: "id"), ForeignKey(["catID1", "catID2"], references: "Cat", targetColumns: ["id1", "id2"], onCascadeDelete: true)]
 }
 
 extension Person: Hashable {
   static func == (lhs: Person, rhs: Person) -> Bool {
-    return lhs.id == rhs.id
+    lhs.id == rhs.id
   }
 
   func hash(into hasher: inout Hasher) {

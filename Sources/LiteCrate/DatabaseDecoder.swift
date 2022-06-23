@@ -5,8 +5,8 @@
 //  Created by Ryan Purpura on 2/14/21.
 //
 
-import LiteCrateCore
 import Foundation
+import LiteCrateCore
 
 class DatabaseDecoder: Decoder {
   struct KDC<Key: CodingKey>: KeyedDecodingContainerProtocol {
@@ -16,7 +16,7 @@ class DatabaseDecoder: Decoder {
     var cursor: Cursor
 
     func contains(_ key: Key) -> Bool {
-      return cursor.columnToIndex[key.stringValue] != nil
+      cursor.columnToIndex[key.stringValue] != nil
     }
 
     func decodeNil(forKey key: Key) throws -> Bool {
@@ -27,7 +27,7 @@ class DatabaseDecoder: Decoder {
       return cursor.isNull(for: index)
     }
 
-    func decode(_ type: Bool.Type, forKey key: Key) throws -> Bool {
+    func decode(_: Bool.Type, forKey key: Key) throws -> Bool {
       guard let index = cursor.columnToIndex[key.stringValue] else {
         throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
       }
@@ -35,7 +35,7 @@ class DatabaseDecoder: Decoder {
       return cursor.bool(for: index)
     }
 
-    func decode(_ type: String.Type, forKey key: Key) throws -> String {
+    func decode(_: String.Type, forKey key: Key) throws -> String {
       guard let index = cursor.columnToIndex[key.stringValue] else {
         throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
       }
@@ -43,7 +43,7 @@ class DatabaseDecoder: Decoder {
       return cursor.string(for: index)
     }
 
-    func decode(_ type: Double.Type, forKey key: Key) throws -> Double {
+    func decode(_: Double.Type, forKey key: Key) throws -> Double {
       guard let index = cursor.columnToIndex[key.stringValue] else {
         throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
       }
@@ -51,55 +51,53 @@ class DatabaseDecoder: Decoder {
       return cursor.double(for: index)
     }
 
-    func decode(_ type: Float.Type, forKey key: Key) throws -> Float {
+    func decode(_: Float.Type, forKey _: Key) throws -> Float {
       fatalError()
     }
 
-    func decode(_ type: Int.Type, forKey key: Key) throws -> Int {
+    func decode(_: Int.Type, forKey _: Key) throws -> Int {
       fatalError()
     }
 
-    func decode(_ type: Int8.Type, forKey key: Key) throws -> Int8 {
+    func decode(_: Int8.Type, forKey _: Key) throws -> Int8 {
       fatalError()
     }
 
-    func decode(_ type: Int16.Type, forKey key: Key) throws -> Int16 {
+    func decode(_: Int16.Type, forKey _: Key) throws -> Int16 {
       fatalError()
     }
 
-    func decode(_ type: Int32.Type, forKey key: Key) throws -> Int32 {
+    func decode(_: Int32.Type, forKey _: Key) throws -> Int32 {
       fatalError()
     }
 
-    func decode(_ type: Int64.Type, forKey key: Key) throws -> Int64 {
+    func decode(_: Int64.Type, forKey key: Key) throws -> Int64 {
       guard let index = cursor.columnToIndex[key.stringValue] else {
         throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
       }
       return cursor.int(for: index)
     }
 
-    func decode(_ type: UInt.Type, forKey key: Key) throws -> UInt {
+    func decode(_: UInt.Type, forKey _: Key) throws -> UInt {
       fatalError()
     }
 
-    func decode(_ type: UInt8.Type, forKey key: Key) throws -> UInt8 {
-      fatalError()
-
-    }
-
-    func decode(_ type: UInt16.Type, forKey key: Key) throws -> UInt16 {
-      fatalError()
-
-    }
-
-    func decode(_ type: UInt32.Type, forKey key: Key) throws -> UInt32 {
+    func decode(_: UInt8.Type, forKey _: Key) throws -> UInt8 {
       fatalError()
     }
 
-    func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64 {
+    func decode(_: UInt16.Type, forKey _: Key) throws -> UInt16 {
       fatalError()
     }
-    
+
+    func decode(_: UInt32.Type, forKey _: Key) throws -> UInt32 {
+      fatalError()
+    }
+
+    func decode(_: UInt64.Type, forKey _: Key) throws -> UInt64 {
+      fatalError()
+    }
+
     func index(for key: Key) throws -> Int32 {
       guard let index = cursor.columnToIndex[key.stringValue] else {
         throw DecodingError.keyNotFound(key, .init(codingPath: codingPath, debugDescription: ""))
@@ -108,7 +106,6 @@ class DatabaseDecoder: Decoder {
     }
 
     func decode<T>(_ type: T.Type, forKey key: Key) throws -> T where T: Decodable {
-
       switch type {
       case is Date.Type, is Date?.Type:
         let index = try index(for: key)
@@ -125,22 +122,21 @@ class DatabaseDecoder: Decoder {
       }
     }
 
-    func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws
-      -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey {
-        fatalError()
+    func nestedContainer<NestedKey>(keyedBy _: NestedKey.Type, forKey _: Key) throws
+      -> KeyedDecodingContainer<NestedKey> where NestedKey: CodingKey
+    {
+      fatalError()
     }
 
-    func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
+    func nestedUnkeyedContainer(forKey _: Key) throws -> UnkeyedDecodingContainer {
       fatalError()
-
     }
 
     func superDecoder() throws -> Decoder {
       fatalError()
-
     }
 
-    func superDecoder(forKey key: Key) throws -> Decoder {
+    func superDecoder(forKey _: Key) throws -> Decoder {
       fatalError()
     }
   }
@@ -148,14 +144,15 @@ class DatabaseDecoder: Decoder {
   var codingPath: [CodingKey] = []
   var userInfo: [CodingUserInfoKey: Any] = [:]
   let cursor: Cursor
-  
+
   init(cursor: Cursor) {
     self.cursor = cursor
   }
 
-  func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key>
-  where Key: CodingKey {
-    return KeyedDecodingContainer(KDC(decoder: self, cursor: cursor))
+  func container<Key>(keyedBy _: Key.Type) throws -> KeyedDecodingContainer<Key>
+    where Key: CodingKey
+  {
+    KeyedDecodingContainer(KDC(decoder: self, cursor: cursor))
   }
 
   func unkeyedContainer() throws -> UnkeyedDecodingContainer {

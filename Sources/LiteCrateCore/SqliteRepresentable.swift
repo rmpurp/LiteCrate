@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 6/12/22.
 //
@@ -19,35 +19,35 @@ public protocol SqliteRepresentable: Codable {
 }
 
 extension Int64: SqliteRepresentable {
-  public var asSqliteType: SqliteType { return .integer(val: self) }
+  public var asSqliteType: SqliteType { .integer(val: self) }
 }
 
 extension Double: SqliteRepresentable {
-  public var asSqliteType: SqliteType { return .real(val: self) }
+  public var asSqliteType: SqliteType { .real(val: self) }
 }
 
 extension String: SqliteRepresentable {
-  public var asSqliteType: SqliteType { return .text(val: self) }
+  public var asSqliteType: SqliteType { .text(val: self) }
 }
 
 extension Data: SqliteRepresentable {
-  public var asSqliteType: SqliteType { return .blob(val: self) }
+  public var asSqliteType: SqliteType { .blob(val: self) }
 }
 
 extension Date: SqliteRepresentable {
   public var asSqliteType: SqliteType {
-    return .integer(val: Int64(timeIntervalSince1970))
+    .integer(val: Int64(timeIntervalSince1970))
   }
 }
 
 extension Bool: SqliteRepresentable {
   public var asSqliteType: SqliteType {
-    return .integer(val: self ? 1 : 0)
+    .integer(val: self ? 1 : 0)
   }
 }
 
 extension UUID: SqliteRepresentable {
   public var asSqliteType: SqliteType {
-    return .text(val: uuidString)
+    .text(val: uuidString)
   }
 }

@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 6/12/22.
 //
@@ -8,7 +8,7 @@
 import Foundation
 
 @resultBuilder
-public struct MigrationStepBuilder {
+public enum MigrationStepBuilder {
   static func buildBlock(_ migrationActions: any MigrationAction...) -> [any MigrationAction] {
     migrationActions
   }
@@ -24,12 +24,12 @@ public struct MigrationGroup: MigrationStep {
   init(@MigrationStepBuilder _ actions: @escaping () -> [any MigrationAction]) {
     self.actions = actions()
   }
-  
-  public var asGroup: MigrationGroup { return self }
+
+  public var asGroup: MigrationGroup { self }
 }
 
 @resultBuilder
-public struct MigrationBuilder {
+public enum MigrationBuilder {
   static func buildBlock(_ migrationSteps: MigrationStep...) -> Migration {
     Migration(steps: migrationSteps.map(\.asGroup))
   }

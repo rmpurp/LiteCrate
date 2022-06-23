@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 6/12/22.
 //
@@ -12,12 +12,12 @@ public protocol ReplicatingModel: DatabaseCodable<UUID> {
   var dot: Dot { get set }
 }
 
-extension ReplicatingModel {
-  public var primaryKeyValue: Key {
+public extension ReplicatingModel {
+  var primaryKeyValue: Key {
     dot.version
   }
-  
-  static public var primaryKeyColumn: String {
+
+  static var primaryKeyColumn: String {
     "version"
   }
 }
