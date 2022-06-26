@@ -101,7 +101,14 @@ struct Merge: TestAction {
   let file: StaticString
   let line: UInt
 
-  init(fromID: Int, toID: Int, debugValue: Int = -1, payloadValues: [Int64]? = nil, file: StaticString = #filePath, line: UInt = #line) {
+  init(
+    fromID: Int,
+    toID: Int,
+    debugValue: Int = -1,
+    payloadValues: [Int64]? = nil,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
     self.fromID = fromID
     self.toID = toID
     self.debugValue = debugValue

@@ -16,7 +16,11 @@ public class LiteCrate {
   private var db: Database
   public var delegate: (any LiteCrateDelegate)?
 
-  public init(_ location: String, delegate: (any LiteCrateDelegate)? = nil, @MigrationBuilder migrations: () -> Migration) throws {
+  public init(
+    _ location: String,
+    delegate: (any LiteCrateDelegate)? = nil,
+    @MigrationBuilder migrations: () -> Migration
+  ) throws {
     db = try Database(location)
     self.delegate = delegate
     try runMigrations(migration: migrations())

@@ -38,10 +38,31 @@ public extension DatabaseCodable {
     }
 
     components.append(contentsOf: sortedColumns.map { "\($0) \($1.rawValue)" })
-    components.append("PRIMARY KEY (\(Self.primaryKeyColumn))")
+    if !(primaryKeyValue is Void) {
+      components.append("PRIMARY KEY (\(Self.primaryKeyColumn))")
+    }
     components.append(contentsOf: Self.foreignKeys.map(\.creationStatement))
     return opening + components.map { "    " + $0 }.joined(separator: ",\n") + ending
   }
+}
+
+extension Never: SqliteRepresentable {
+  public var asSqliteType: LiteCrateCore.SqliteType {
+    switch self {}
+  }
+
+  public func encode(to _: Encoder) throws {
+    switch self {}
+  }
+
+  public init(from _: Decoder) throws {
+    switch self {}
+  }
+}
+
+public extension DatabaseCodable where Key == Never {
+  static var primaryKeyColumn: String { "" }
+  var primaryKeyValue: Key { fatalError() }
 }
 
 public extension DatabaseCodable where Self: Identifiable, ID == Key {
@@ -73,7 +94,12 @@ public struct ForeignKey {
   public var targetColumn: String
   public var onDelete: OnDelete
 
-  public init(_ columnName: String, references targetTable: String, targetColumn: String, onDelete: OnDelete = .noAction) {
+  public init(
+    _ columnName: String,
+    references targetTable: String,
+    targetColumn: String,
+    onDelete: OnDelete = .noAction
+  ) {
     self.columnName = columnName
     self.targetColumn = targetColumn
     self.targetTable = targetTable

@@ -12,10 +12,9 @@ import LiteCrateCore
 class ReplicationController: LiteCrateDelegate {
   private var liteCrate: LiteCrate!
 
-  private var needToIncrementTime = false
-
   var exampleInstances = [any ReplicatingModel]()
   var nodeID: UUID
+  var transactionTime: Int64!
   var time: Int64!
 
   var userInfo: [CodingUserInfoKey: Any] {
@@ -32,13 +31,10 @@ class ReplicationController: LiteCrateDelegate {
     try liteCrate.inTransaction(block: block)
   }
 
-  func filter<T>(model: T) throws -> Bool where T: DatabaseCodable {
-    guard let model = model as? any ReplicatingModel else { return true }
-    return !model.dot.isDeleted
-  }
-
   func migration(didInitializeIn proxy: LiteCrate.TransactionProxy) throws {
     try proxy.execute("CREATE TABLE Node (id TEXT PRIMARY KEY, time INT NOT NULL, minTime INT NOT NULL)")
+    try proxy
+      .execute(EmptyRange(node: UUID(), start: 0, end: 0, modifiedNode: UUID(), modifiedTime: 0).creationStatement)
     try proxy.execute("INSERT INTO Node VALUES (?, 0, 0)", [nodeID])
   }
 
@@ -49,40 +45,53 @@ class ReplicationController: LiteCrateDelegate {
   }
 
   func transaction(didBeginIn proxy: LiteCrate.TransactionProxy) throws {
-    needToIncrementTime = false
     let cursor = try proxy.query("SELECT time FROM Node WHERE id = ?", [nodeID])
     guard cursor.step() else { fatalError("Corrupt database.") }
     time = cursor.int(for: 0)
-  }
-
-  func transactionDidEnd() {
-    needToIncrementTime = false
+    transactionTime = time
   }
 
   func transaction(willCommitIn proxy: LiteCrate.TransactionProxy) throws {
-    if needToIncrementTime {
-      try proxy.execute("UPDATE Node SET time = time + 1 WHERE id = ?", [nodeID])
-    }
+    try proxy.execute("UPDATE Node SET time = ? WHERE id = ?", [time, nodeID])
   }
 
   func proxy<T>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws -> T where T: DatabaseCodable {
     if var model = model as? any ReplicatingModel {
-      if !model.dot.isDeleted {
-        try model.deleteCompetingModels(proxy, time: time, node: nodeID)
-      }
-      needToIncrementTime = true
-      model.dot.update(modifiedBy: nodeID, at: time)
+      try model.deleteCompetingModels(proxy, time: time, node: nodeID)
+      time += 1
+      model.dot.update(modifiedBy: nodeID, at: time, transactionTime: transactionTime)
 
       return model as! T
     }
     return model
   }
 
-  func proxy<T: DatabaseCodable>(_: LiteCrate.TransactionProxy, willDelete model: T) throws -> T? {
-    if var model = model as? (any ReplicatingModel) {
-      model.dot.delete(modifiedBy: nodeID, at: time)
-      needToIncrementTime = true
-      return (model as! T)
+  // MARK: - Range CRUD
+
+  private func fetchOverlappingRanges(_ proxy: LiteCrate.TransactionProxy, range: EmptyRange) throws -> [EmptyRange] {
+    try proxy.fetch(EmptyRange.self, allWhere: "start <= ? AND end >= ?", [range.end + 1, range.start - 1])
+  }
+
+  private func saveAndResolve(_ proxy: LiteCrate.TransactionProxy, range: EmptyRange) throws {
+    var range = range
+    for overlappingRange in try fetchOverlappingRanges(proxy, range: range) {
+      range.start = min(range.start, overlappingRange.start)
+      range.end = max(range.end, overlappingRange.end)
+      try proxy.deleteIgnoringDelegate(overlappingRange)
+    }
+    try proxy.saveIgnoringDelegate(range)
+  }
+
+  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willDelete model: T) throws -> T? {
+    if let model = model as? (any ReplicatingModel) {
+      let range = EmptyRange(
+        node: model.dot.creator,
+        start: model.dot.createdTime,
+        end: model.dot.createdTime,
+        modifiedNode: nodeID,
+        modifiedTime: transactionTime
+      )
+      try saveAndResolve(proxy, range: range)
     }
     return nil
   }

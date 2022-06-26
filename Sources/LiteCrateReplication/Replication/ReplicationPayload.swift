@@ -25,14 +25,17 @@ struct TableNameCodingKey: CodingKey {
 class ReplicationPayload: Codable {
   var models = [String: [any ReplicatingModel]]()
   var nodes = [Node]()
+  var ranges = [EmptyRange]()
 
-  init(models: [String: [any ReplicatingModel]], nodes: [Node]) {
+  init(models: [String: [any ReplicatingModel]], nodes: [Node], ranges: [EmptyRange]) {
     self.models = models
     self.nodes = nodes
+    self.ranges = ranges
   }
 
   required init(from decoder: Decoder) throws {
-    guard let exampleInstances = decoder.userInfo[CodingUserInfoKey(rawValue: "instances")!] as? [any ReplicatingModel] else {
+    guard let exampleInstances = decoder.userInfo[CodingUserInfoKey(rawValue: "instances")!] as? [any ReplicatingModel]
+    else {
       preconditionFailure()
     }
 
@@ -43,6 +46,7 @@ class ReplicationPayload: Codable {
     }
 
     nodes = try container.decode([Node].self, forKey: .init(stringValue: Node.tableName))
+    ranges = try container.decode([EmptyRange].self, forKey: .init(stringValue: EmptyRange.tableName))
   }
 
   func encode(to encoder: Encoder) throws {
@@ -54,9 +58,12 @@ class ReplicationPayload: Codable {
       }
     }
     try container.encode(nodes, forKey: .init(stringValue: Node.tableName))
+    try container.encode(ranges, forKey: .init(stringValue: EmptyRange.tableName))
   }
 }
 
-private func decode<T: ReplicatingModel>(instance: T, container: KeyedDecodingContainer<TableNameCodingKey>) throws -> [T] {
+private func decode<T: ReplicatingModel>(instance: T,
+                                         container: KeyedDecodingContainer<TableNameCodingKey>) throws -> [T]
+{
   try container.decode([T].self, forKey: .init(stringValue: instance.tableName))
 }
