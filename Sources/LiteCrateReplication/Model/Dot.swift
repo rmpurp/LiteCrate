@@ -50,7 +50,7 @@ public struct Dot: Codable {
 
   // MARK: - CRUD
 
-  mutating func update(modifiedBy node: UUID, at time: Int64) {
+  mutating func update(modifiedBy node: UUID, at time: Int64, transactionTime: Int64) {
     if !isInitialized {
       createdTime = time
       creator = node
@@ -58,17 +58,17 @@ public struct Dot: Codable {
     } else {
       lamportClock += 1
     }
-    sequenceNumber = time
+    sequenceNumber = transactionTime
     lastModifier = node
   }
 
-  mutating func delete(modifiedBy node: UUID, at time: Int64) {
+  mutating func delete(modifiedBy node: UUID, at time: Int64, transactionTime: Int64) {
     if !isInitialized {
       createdTime = time
       creator = node
     }
     isDeleted = true
-    sequenceNumber = time
+    sequenceNumber = transactionTime
     lastModifier = node
   }
 

@@ -12,11 +12,10 @@ import LiteCrateCore
 class ReplicationController: LiteCrateDelegate {
   private var liteCrate: LiteCrate!
 
-  private var needToIncrementTime = false
-
   var exampleInstances = [any ReplicatingModel]()
   var nodeID: UUID
   var time: Int64!
+  var transactionTime: Int64!
 
   var userInfo: [CodingUserInfoKey: Any] {
     [.init(rawValue: "instances")!: exampleInstances]
@@ -49,20 +48,14 @@ class ReplicationController: LiteCrateDelegate {
   }
 
   func transaction(didBeginIn proxy: LiteCrate.TransactionProxy) throws {
-    needToIncrementTime = false
     let cursor = try proxy.query("SELECT time FROM Node WHERE id = ?", [nodeID])
     guard cursor.step() else { fatalError("Corrupt database.") }
     time = cursor.int(for: 0)
-  }
-
-  func transactionDidEnd() {
-    needToIncrementTime = false
+    transactionTime = time
   }
 
   func transaction(willCommitIn proxy: LiteCrate.TransactionProxy) throws {
-    if needToIncrementTime {
-      try proxy.execute("UPDATE Node SET time = time + 1 WHERE id = ?", [nodeID])
-    }
+    try proxy.execute("UPDATE Node SET time = ? WHERE id = ?", [time, nodeID])
   }
 
   func proxy<T>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws -> T where T: DatabaseCodable {
@@ -70,9 +63,8 @@ class ReplicationController: LiteCrateDelegate {
       if !model.dot.isDeleted {
         try model.deleteCompetingModels(proxy, time: time, node: nodeID)
       }
-      needToIncrementTime = true
-      model.dot.update(modifiedBy: nodeID, at: time)
-
+      model.dot.update(modifiedBy: nodeID, at: time, transactionTime: transactionTime)
+      time += 1
       return model as! T
     }
     return model
@@ -80,8 +72,8 @@ class ReplicationController: LiteCrateDelegate {
 
   func proxy<T: DatabaseCodable>(_: LiteCrate.TransactionProxy, willDelete model: T) throws -> T? {
     if var model = model as? (any ReplicatingModel) {
-      model.dot.delete(modifiedBy: nodeID, at: time)
-      needToIncrementTime = true
+      model.dot.delete(modifiedBy: nodeID, at: time, transactionTime: transactionTime)
+      time += 1
       return (model as! T)
     }
     return nil

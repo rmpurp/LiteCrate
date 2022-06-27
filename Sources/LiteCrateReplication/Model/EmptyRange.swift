@@ -22,4 +22,6 @@ struct EmptyRange: DatabaseCodable, Identifiable {
   var lastModifier: Node.Key
   /// The time (WRT to the lastModifier) that this range was last updated; for efficient delta updates only.
   var sequenceNumber: Int64
+
+  mutating func merge(_: [EmptyRange]) {}
 }
