@@ -105,10 +105,9 @@ extension ReplicatingModel {
     // Avoid recursively calling delegate methods by updating rows directly
     let query = """
     UPDATE \(Self.tableName)
-        SET modifiedTime = NULL,
-            modifiedNode = NULL,
-            witnessedTime = ?,
-            witnessedNode = ?
+        SET isDeleted = TRUE,
+            sequenceNumber = ?,
+            lastModifier = ?
         WHERE id = ? AND version <> ?
     """
     try proxy.execute(query, [time, node, dot.id, dot.version])

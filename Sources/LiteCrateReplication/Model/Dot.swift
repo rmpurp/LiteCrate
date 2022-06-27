@@ -14,47 +14,79 @@ public struct Timestamp: Equatable, Codable {
 }
 
 public struct Dot: Codable {
+  /// The version of the model that was generated when it was first created.
+  var version: UUID
+  /// The stable id of the model.
+  var id: UUID
+
+  /// The node that created the model.
+  private(set) var creator: Node.Key
+  /// The time (WRT to the creator) at which the model was created.
+  private(set) var createdTime_: Int64
+  /// The last node to modify the model.
+  private(set) var lastModifier: Node.Key
+  /// The time (WRT the lastModifier) that the model was last updated; for efficient delta updates only.
+  private(set) var sequenceNumber: Int64
+  /// Internal clock; incremented for each modification. Used to resolve conflicts between concurrent updates.
+  /// If equal, then lastModifier's id is used as a tiebreaker.
+  private(set) var lamportClock: Int64
+
   init() {
-    version = UUID()
-    id = UUID()
-    createdTime = Timestamp(time: -1, node: UUID())
-    modifiedTime = Timestamp(time: -1, node: UUID())
-    witnessedTime = Timestamp(time: -1, node: UUID())
+    self.init(id: UUID())
   }
 
   init(id: UUID) {
     version = UUID()
     self.id = id
-    createdTime = Timestamp(time: -1, node: UUID())
-    modifiedTime = Timestamp(time: -1, node: UUID())
-    witnessedTime = Timestamp(time: -1, node: UUID())
+    creator = UUID()
+    createdTime_ = -1
+    lastModifier = UUID()
+    sequenceNumber = -1
+    lamportClock = -1
+  }
+
+  // MARK: - Shims
+
+  var isDeleted: Bool = false
+
+  var createdTime: Timestamp {
+    Timestamp(time: createdTime_, node: creator)
+  }
+
+  var modifiedTime: Timestamp {
+    Timestamp(time: sequenceNumber, node: lastModifier)
+  }
+
+  var witnessedTime: Timestamp {
+    Timestamp(time: sequenceNumber, node: lastModifier)
   }
 
   var isInitialized: Bool {
-    createdTime.time >= 0
+    createdTime_ >= 0
   }
 
-  var isDeleted: Bool {
-    modifiedTime == nil
-  }
+  // MARK: - CRUD
 
   mutating func update(modifiedBy node: UUID, at time: Int64) {
-    let now = Timestamp(time: time, node: node)
     if !isInitialized {
-      createdTime = now
+      createdTime_ = time
+      creator = node
+      lamportClock = 0
+    } else {
+      lamportClock += 1
     }
-    modifiedTime = now
-    witnessedTime = now
+    sequenceNumber = time
+    lastModifier = node
   }
 
   mutating func delete(modifiedBy node: UUID, at time: Int64) {
-    let now = Timestamp(time: time, node: node)
     if !isInitialized {
-      createdTime = now
+      createdTime_ = time
+      creator = node
     }
-
-    modifiedTime = nil
-    witnessedTime = now
+    isDeleted = true
+    sequenceNumber = time
+    lastModifier = node
   }
 
   static func < (lhs: Self, rhs: Self) -> Bool {
@@ -66,64 +98,16 @@ public struct Dot: Codable {
     }
 
     if lhs.version == rhs.version {
-      guard let lhsTimeModified = lhs.modifiedTime?.time else { return false }
-      guard let rhsTimeModified = rhs.modifiedTime?.time else { return true } // rhs deleted, so "newer"
+      guard !lhs.isDeleted else { return false }
+      guard !rhs.isDeleted else { return true } // rhs deleted, so "newer"
 
-      return lhsTimeModified < rhsTimeModified
+      return lhs.sequenceNumber < rhs.sequenceNumber
     } else {
-      if lhs.createdTime.time == rhs.createdTime.time {
-        return lhs.createdTime.node.uuidString < rhs.createdTime.node.uuidString
+      if lhs.createdTime_ == rhs.createdTime_ {
+        return lhs.creator.uuidString < rhs.creator.uuidString
       }
-      return lhs.createdTime.time < rhs.createdTime.time
+      return lhs.createdTime_ < rhs.createdTime_
     }
-  }
-
-  var version: UUID
-  var id: UUID
-
-  private(set) var createdTime: Timestamp
-  private(set) var modifiedTime: Timestamp?
-  private(set) var witnessedTime: Timestamp
-
-  private enum CodingKeys: String, CodingKey {
-    case id
-    case version
-    case createdTime
-    case createdNode
-    case modifiedTime
-    case modifiedNode
-    case witnessedTime
-    case witnessedNode
-  }
-
-  public func encode(to encoder: Encoder) throws {
-    var container = encoder.container(keyedBy: Self.CodingKeys)
-    try container.encode(version, forKey: .version)
-    try container.encode(id, forKey: .id)
-    try container.encode(createdTime.time, forKey: .createdTime)
-    try container.encode(createdTime.node, forKey: .createdNode)
-    try container.encodeIfPresent(modifiedTime?.time, forKey: .modifiedTime)
-    try container.encodeIfPresent(modifiedTime?.node, forKey: .modifiedNode)
-    try container.encode(witnessedTime.time, forKey: .witnessedTime)
-    try container.encode(witnessedTime.node, forKey: .witnessedNode)
-  }
-
-  public init(from decoder: Decoder) throws {
-    let container = try decoder.container(keyedBy: Self.CodingKeys)
-    version = try container.decode(UUID.self, forKey: .version)
-    id = try container.decode(UUID.self, forKey: .id)
-    createdTime = try Timestamp(time: container.decode(Int64.self, forKey: .createdTime),
-                                node: container.decode(UUID.self, forKey: .createdNode))
-    if let modifiedTime = try container.decodeIfPresent(Int64.self, forKey: .modifiedTime),
-       let modifiedNode = try container.decodeIfPresent(UUID.self, forKey: .modifiedNode)
-    {
-      self.modifiedTime = Timestamp(time: modifiedTime,
-                                    node: modifiedNode)
-    } else {
-      modifiedTime = nil
-    }
-    witnessedTime = try Timestamp(time: container.decode(Int64.self, forKey: .witnessedTime),
-                                  node: container.decode(UUID.self, forKey: .witnessedNode))
   }
 }
 

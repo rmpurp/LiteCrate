@@ -38,7 +38,7 @@ extension ReplicationController {
 
   /// If it exists, get the dot corresponding to the model with the same id and not null.
   private func getActiveWithSameID<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, model: T) throws -> T? {
-    try proxy.fetchIgnoringDelegate(T.self, allWhere: "modifiedTime IS NOT NULL AND id = ?", [model.dot.id]).first
+    try proxy.fetchIgnoringDelegate(T.self, allWhere: "isDeleted = FALSE AND id = ?", [model.dot.id]).first
   }
 
   private func getWithSameVersion<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, model: T) throws -> T? {
@@ -111,7 +111,7 @@ private func fetch<T: ReplicatingModel>(instance _: T, proxy: LiteCrate.Transact
   for node in nodes {
     models.append(contentsOf: try proxy.fetchIgnoringDelegate(
       T.self,
-      allWhere: "witnessedNode = ? AND witnessedTime >= ?",
+      allWhere: "lastModifier = ? AND sequenceNumber >= ?",
       [node.id, node.time]
     ))
   }

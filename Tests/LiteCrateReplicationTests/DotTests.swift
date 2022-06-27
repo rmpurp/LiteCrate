@@ -77,7 +77,6 @@ final class DotTests: XCTestCase {
       let boss1Fetched = try proxy.fetchIgnoringDelegate(Boss.self, with: boss1.primaryKeyValue)!
       XCTAssertEqual(boss1Fetched.age, 42)
       XCTAssertEqual(boss1Fetched.dot.isDeleted, true)
-      XCTAssertNil(boss1Fetched.dot.modifiedTime)
       XCTAssertEqual(boss1Fetched.dot.createdTime.time, 0)
       XCTAssertEqual(boss1Fetched.dot.witnessedTime.time, 1)
     }
