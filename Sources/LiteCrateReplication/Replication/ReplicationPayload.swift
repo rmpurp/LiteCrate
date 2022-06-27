@@ -25,10 +25,12 @@ struct TableNameCodingKey: CodingKey {
 class ReplicationPayload: Codable {
   var models = [String: [any ReplicatingModel]]()
   var nodes = [Node]()
+  var ranges = [EmptyRange]()
 
-  init(models: [String: [any ReplicatingModel]], nodes: [Node]) {
+  init(models: [String: [any ReplicatingModel]], nodes: [Node], ranges: [EmptyRange]) {
     self.models = models
     self.nodes = nodes
+    self.ranges = ranges
   }
 
   required init(from decoder: Decoder) throws {
@@ -44,6 +46,7 @@ class ReplicationPayload: Codable {
     }
 
     nodes = try container.decode([Node].self, forKey: .init(stringValue: Node.tableName))
+    ranges = try container.decode([EmptyRange].self, forKey: .init(stringValue: EmptyRange.tableName))
   }
 
   func encode(to encoder: Encoder) throws {
@@ -55,6 +58,7 @@ class ReplicationPayload: Codable {
       }
     }
     try container.encode(nodes, forKey: .init(stringValue: Node.tableName))
+    try container.encode(ranges, forKey: .init(stringValue: EmptyRange.tableName))
   }
 }
 

@@ -41,6 +41,9 @@ final class PayloadTests: XCTestCase {
       Node(id: UUID(), minTime: 1, time: 2),
       Node(id: UUID(), minTime: 3, time: 4),
       Node(id: UUID(), minTime: 5, time: 6),
+    ], ranges: [
+      EmptyRange(node: UUID(), start: 0, end: 3, sequenceNumber: 5),
+      EmptyRange(node: UUID(), start: 7, end: 9, sequenceNumber: 1003),
     ])
 
     let jsonEncoder = JSONEncoder()

@@ -12,6 +12,7 @@ extension ReplicationController {
   public func payload(remoteNodes: [Node]) throws -> ReplicationPayload {
     var models = [String: [any ReplicatingModel]]()
     var localNodes = [Node]()
+    var ranges = [EmptyRange]()
     try inTransaction { [unowned self] proxy in
       localNodes.append(contentsOf: try proxy.fetch(Node.self))
       let nodesForFetching = Node.mergeForEncoding(localNodes: localNodes, remoteNodes: remoteNodes)
@@ -19,8 +20,11 @@ extension ReplicationController {
       for exampleInstance in exampleInstances {
         models[exampleInstance.tableName] = try fetch(instance: exampleInstance, proxy: proxy, nodes: nodesForFetching)
       }
+
+      ranges.append(contentsOf: try fetchEmptyRanges(proxy: proxy, nodes: nodesForFetching))
     }
-    return ReplicationPayload(models: models, nodes: localNodes)
+    // TODO: Fetch ranges
+    return ReplicationPayload(models: models, nodes: localNodes, ranges: ranges)
   }
 
   public func merge(_ payload: ReplicationPayload) throws {
@@ -116,6 +120,21 @@ private func fetch<T: ReplicatingModel>(instance _: T, proxy: LiteCrate.Transact
     ))
   }
   return models
+}
+
+// TODO: somehow combine with above.
+private func fetchEmptyRanges(proxy: LiteCrate.TransactionProxy,
+                              nodes: [Node]) throws -> [EmptyRange]
+{
+  var ranges: [EmptyRange] = []
+  for node in nodes {
+    ranges.append(contentsOf: try proxy.fetchIgnoringDelegate(
+      EmptyRange.self,
+      allWhere: "lastModifier = ? AND sequenceNumber >= ?",
+      [node.id, node.time]
+    ))
+  }
+  return ranges
 }
 
 private func populate<T: ReplicatingModel>(
