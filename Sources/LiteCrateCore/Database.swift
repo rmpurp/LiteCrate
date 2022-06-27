@@ -71,7 +71,13 @@ public class Database {
         sqlite3_bind_text(ppStmt, columnIndex, val, Int32(val.lengthOfBytes(using: .utf8)), SQLITE_TRANSIENT)
       case let .blob(val):
         _ = val.withUnsafeBytes { bufferPointer in
-          sqlite3_bind_blob(ppStmt, columnIndex, bufferPointer.baseAddress, Int32(bufferPointer.count), SQLITE_TRANSIENT)
+          sqlite3_bind_blob(
+            ppStmt,
+            columnIndex,
+            bufferPointer.baseAddress,
+            Int32(bufferPointer.count),
+            SQLITE_TRANSIENT
+          )
         }
       case .none:
         sqlite3_bind_null(ppStmt, columnIndex)

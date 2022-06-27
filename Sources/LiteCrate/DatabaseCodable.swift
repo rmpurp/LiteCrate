@@ -73,7 +73,12 @@ public struct ForeignKey {
   public var targetColumn: String
   public var onDelete: OnDelete
 
-  public init(_ columnName: String, references targetTable: String, targetColumn: String, onDelete: OnDelete = .noAction) {
+  public init(
+    _ columnName: String,
+    references targetTable: String,
+    targetColumn: String,
+    onDelete: OnDelete = .noAction
+  ) {
     self.columnName = columnName
     self.targetColumn = targetColumn
     self.targetTable = targetTable

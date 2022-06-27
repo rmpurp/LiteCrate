@@ -32,7 +32,8 @@ class ReplicationPayload: Codable {
   }
 
   required init(from decoder: Decoder) throws {
-    guard let exampleInstances = decoder.userInfo[CodingUserInfoKey(rawValue: "instances")!] as? [any ReplicatingModel] else {
+    guard let exampleInstances = decoder.userInfo[CodingUserInfoKey(rawValue: "instances")!] as? [any ReplicatingModel]
+    else {
       preconditionFailure()
     }
 
@@ -57,6 +58,8 @@ class ReplicationPayload: Codable {
   }
 }
 
-private func decode<T: ReplicatingModel>(instance: T, container: KeyedDecodingContainer<TableNameCodingKey>) throws -> [T] {
+private func decode<T: ReplicatingModel>(instance: T,
+                                         container: KeyedDecodingContainer<TableNameCodingKey>) throws -> [T]
+{
   try container.decode([T].self, forKey: .init(stringValue: instance.tableName))
 }

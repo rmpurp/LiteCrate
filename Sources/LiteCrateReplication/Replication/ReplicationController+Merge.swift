@@ -104,20 +104,25 @@ extension ReplicationController {
   }
 }
 
-private func fetch<T: ReplicatingModel>(instance _: T, proxy: LiteCrate.TransactionProxy, nodes: [Node]) throws -> [any ReplicatingModel] {
+private func fetch<T: ReplicatingModel>(instance _: T, proxy: LiteCrate.TransactionProxy,
+                                        nodes: [Node]) throws -> [any ReplicatingModel]
+{
   var models: [T] = []
   for node in nodes {
     models.append(contentsOf: try proxy.fetchIgnoringDelegate(
       T.self,
       allWhere: "witnessedNode = ? AND witnessedTime >= ?",
       [node.id, node.time]
-    )
-    )
+    ))
   }
   return models
 }
 
-private func populate<T: ReplicatingModel>(instance _: T, proxy: LiteCrate.TransactionProxy, container: KeyedDecodingContainer<TableNameCodingKey>) throws {
+private func populate<T: ReplicatingModel>(
+  instance _: T,
+  proxy: LiteCrate.TransactionProxy,
+  container: KeyedDecodingContainer<TableNameCodingKey>
+) throws {
   let instances = try container.decode([T].self, forKey: TableNameCodingKey(stringValue: T.tableName))
   for instance in instances {
     try proxy.saveIgnoringDelegate(instance)

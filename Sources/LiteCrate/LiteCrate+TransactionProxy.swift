@@ -18,11 +18,15 @@ public extension LiteCrate {
       try fetch(type, allWhere: "\(T.primaryKeyColumn) = ?", [primaryKey]).first
     }
 
-    public func fetchIgnoringDelegate<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type, with primaryKey: U) throws -> T? {
+    public func fetchIgnoringDelegate<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type,
+                                                                                  with primaryKey: U) throws -> T?
+    {
       try fetchIgnoringDelegate(type, allWhere: "\(T.primaryKeyColumn) = ?", [primaryKey]).first
     }
 
-    public func fetch<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws -> [T] {
+    public func fetch<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
+                                          _ values: [SqliteRepresentable?] = []) throws -> [T]
+    {
       let sqlWhereClause = sqlWhereClause ?? "TRUE"
       let cursor = try db.query("SELECT * FROM \(T.tableName) WHERE \(sqlWhereClause)", values)
       let decoder = DatabaseDecoder(cursor: cursor)
@@ -40,7 +44,9 @@ public extension LiteCrate {
       return models
     }
 
-    public func fetchIgnoringDelegate<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws -> [T] {
+    public func fetchIgnoringDelegate<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
+                                                          _ values: [SqliteRepresentable?] = []) throws -> [T]
+    {
       let sqlWhereClause = sqlWhereClause ?? "TRUE"
       let cursor = try db.query("SELECT * FROM \(T.tableName) WHERE \(sqlWhereClause)", values)
       let decoder = DatabaseDecoder(cursor: cursor)
@@ -52,9 +58,18 @@ public extension LiteCrate {
     }
 
     // TODO: Delete.
-    public func fetch<T: DatabaseCodable>(_: T.Type, joining joinTable: String, on joinClause: String, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws -> [T] {
+    public func fetch<T: DatabaseCodable>(
+      _: T.Type,
+      joining joinTable: String,
+      on joinClause: String,
+      allWhere sqlWhereClause: String? = nil,
+      _ values: [SqliteRepresentable?] = []
+    ) throws -> [T] {
       let sqlWhereClause = sqlWhereClause ?? "TRUE"
-      let cursor = try db.query("SELECT \(T.tableName).* FROM \(T.tableName) INNER JOIN \(joinTable) ON \(joinClause) WHERE \(sqlWhereClause)", values)
+      let cursor = try db.query(
+        "SELECT \(T.tableName).* FROM \(T.tableName) INNER JOIN \(joinTable) ON \(joinClause) WHERE \(sqlWhereClause)",
+        values
+      )
       let decoder = DatabaseDecoder(cursor: cursor)
       var models = [T]()
       while cursor.step() {
@@ -107,7 +122,9 @@ public extension LiteCrate {
       try delete(model)
     }
 
-    public func delete<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil, _ values: [SqliteRepresentable?] = []) throws {
+    public func delete<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
+                                           _ values: [SqliteRepresentable?] = []) throws
+    {
       let sqlWhereClause = sqlWhereClause.flatMap { "WHERE \($0)" } ?? ""
       try db.execute("DELETE FROM \(T.tableName) \(sqlWhereClause)", values)
     }
