@@ -23,12 +23,12 @@ struct EmptyRange: DatabaseCodable, Identifiable {
   /// The time (WRT to the lastModifier) that this range was last updated; for efficient delta updates only.
   var sequenceNumber: Int64
 
-  init(node: Node.Key, start: Int64, end: Int64, sequenceNumber: Int64) {
+  init(node: Node.Key, start: Int64, end: Int64, lastModifier: Node.Key, sequenceNumber: Int64) {
     id = UUID()
     self.start = start
     self.end = end
     self.node = node
-    lastModifier = node
+    self.lastModifier = lastModifier
     self.sequenceNumber = sequenceNumber
   }
 }

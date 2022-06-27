@@ -36,6 +36,7 @@ extension ReplicationController {
       for node in Node.mergeForDecoding(nodeID: nodeID, localNodes: localNodes, remoteNodes: payload.nodes) {
         try localProxy.saveIgnoringDelegate(node)
       }
+
       for emptyRange in payload.ranges {
         try addAndMerge(localProxy, range: emptyRange, deleteModels: true)
       }

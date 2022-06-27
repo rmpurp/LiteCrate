@@ -26,7 +26,7 @@ final class MergeTests: XCTestCase {
       Delete(databaseID: 1, value: 0)
       Verify(databaseID: 1, values: [1, 2, 3])
 
-      Merge(fromID: 1, toID: 0, payloadValues: [0, 2, 3])
+      Merge(fromID: 1, toID: 0, payloadValues: [2, 3])
       Verify(databaseID: 0, values: [1, 2, 3])
 
       Add(databaseID: 0, value: 4)
@@ -36,7 +36,7 @@ final class MergeTests: XCTestCase {
       Add(databaseID: 1, value: 7)
       Delete(databaseID: 1, value: 2)
       Verify(databaseID: 1, values: [1, 3, 6, 7])
-      Merge(fromID: 1, toID: 0, debugValue: 2, payloadValues: [2, 6, 7])
+      Merge(fromID: 1, toID: 0, debugValue: 2, payloadValues: [6, 7])
       Verify(databaseID: 0, values: [3, 4, 5, 6, 7])
       Merge(fromID: 0, toID: 1, payloadValues: [4, 5])
       Verify(databaseID: 1, values: [3, 4, 5, 6, 7])
@@ -73,7 +73,7 @@ final class MergeTests: XCTestCase {
       Verify(databaseID: 1, values: [11, 12, 101, 102])
       Merge(fromID: 0, toID: 1, debugValue: 100, payloadValues: [200, 201, 202])
       Verify(databaseID: 1, values: [11, 12, 101, 102])
-      Merge(fromID: 1, toID: 0, payloadValues: [5, 6, 7])
+      Merge(fromID: 1, toID: 0, payloadValues: [])
       Verify(databaseID: 1, values: [11, 12, 101, 102])
     }
   }

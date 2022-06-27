@@ -38,7 +38,8 @@ class ReplicationController: LiteCrateDelegate {
 
   func migration(didInitializeIn proxy: LiteCrate.TransactionProxy) throws {
     try proxy.execute("CREATE TABLE Node (id TEXT PRIMARY KEY, time INT NOT NULL, minTime INT NOT NULL)")
-    try proxy.execute(EmptyRange(node: UUID(), start: 0, end: 0, sequenceNumber: 0).creationStatement)
+    try proxy
+      .execute(EmptyRange(node: UUID(), start: 0, end: 0, lastModifier: UUID(), sequenceNumber: 0).creationStatement)
     try proxy.execute("INSERT INTO Node VALUES (?, 0, 0)", [nodeID])
   }
 
@@ -72,12 +73,15 @@ class ReplicationController: LiteCrateDelegate {
   }
 
   func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willDelete model: T) throws -> T? {
-    if var model = model as? (any ReplicatingModel) {
-      model.dot.delete(modifiedBy: nodeID, at: time, transactionTime: transactionTime)
-      let emptyRange = EmptyRange(node: nodeID, start: time, end: time, sequenceNumber: transactionTime)
+    if let model = model as? (any ReplicatingModel) {
+      let emptyRange = EmptyRange(
+        node: model.dot.creator,
+        start: model.dot.createdTime,
+        end: model.dot.createdTime,
+        lastModifier: nodeID,
+        sequenceNumber: transactionTime
+      )
       try addAndMerge(proxy, range: emptyRange)
-      time += 1
-      return (model as! T)
     }
     return nil
   }
@@ -123,7 +127,7 @@ extension ReplicationController {
       allWhere: "creator = ? AND ? <= createdTime AND createdTime <= ?",
       [range.node, range.start, range.end]
     )
-    
+
     for model in models {
       try proxy.deleteIgnoringDelegate(model)
     }
