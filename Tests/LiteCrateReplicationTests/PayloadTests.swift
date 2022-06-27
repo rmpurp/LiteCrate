@@ -25,14 +25,6 @@ extension Node: Equatable {
 }
 
 final class PayloadTests: XCTestCase {
-  override func setUpWithError() throws {
-    // Put setup code here. This method is called before the invocation of each test method in the class.
-  }
-
-  override func tearDownWithError() throws {
-    // Put teardown code here. This method is called after the invocation of each test method in the class.
-  }
-
   func testPayloadCodingRoundtrip() throws {
     let payload = ReplicationPayload(models: [
       "ModelA": [ModelA(value: 5), ModelA(value: 8)],
@@ -41,6 +33,9 @@ final class PayloadTests: XCTestCase {
       Node(id: UUID(), minTime: 1, time: 2),
       Node(id: UUID(), minTime: 3, time: 4),
       Node(id: UUID(), minTime: 5, time: 6),
+    ], ranges: [
+      EmptyRange(node: UUID(), start: 0, end: 3, lastModifier: UUID(), sequenceNumber: 5),
+      EmptyRange(node: UUID(), start: 7, end: 9, lastModifier: UUID(), sequenceNumber: 1003),
     ])
 
     let jsonEncoder = JSONEncoder()

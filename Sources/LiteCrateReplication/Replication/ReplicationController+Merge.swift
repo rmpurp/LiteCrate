@@ -12,6 +12,7 @@ extension ReplicationController {
   public func payload(remoteNodes: [Node]) throws -> ReplicationPayload {
     var models = [String: [any ReplicatingModel]]()
     var localNodes = [Node]()
+    var ranges = [EmptyRange]()
     try inTransaction { [unowned self] proxy in
       localNodes.append(contentsOf: try proxy.fetch(Node.self))
       let nodesForFetching = Node.mergeForEncoding(localNodes: localNodes, remoteNodes: remoteNodes)
@@ -19,8 +20,10 @@ extension ReplicationController {
       for exampleInstance in exampleInstances {
         models[exampleInstance.tableName] = try fetch(instance: exampleInstance, proxy: proxy, nodes: nodesForFetching)
       }
+
+      ranges.append(contentsOf: try fetchEmptyRanges(proxy: proxy, nodes: nodesForFetching))
     }
-    return ReplicationPayload(models: models, nodes: localNodes)
+    return ReplicationPayload(models: models, nodes: localNodes, ranges: ranges)
   }
 
   public func merge(_ payload: ReplicationPayload) throws {
@@ -33,91 +36,83 @@ extension ReplicationController {
       for node in Node.mergeForDecoding(nodeID: nodeID, localNodes: localNodes, remoteNodes: payload.nodes) {
         try localProxy.saveIgnoringDelegate(node)
       }
+
+      for emptyRange in payload.ranges {
+        try addAndMerge(localProxy, range: emptyRange, deleteModels: true)
+      }
     }
   }
 
-  /// If it exists, get the dot corresponding to the model with the same id and not null.
-  private func getActiveWithSameID<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, model: T) throws -> T? {
-    try proxy.fetchIgnoringDelegate(T.self, allWhere: "modifiedTime IS NOT NULL AND id = ?", [model.dot.id]).first
-  }
-
-  private func getWithSameVersion<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, model: T) throws -> T? {
-    try proxy.fetchIgnoringDelegate(T.self, with: model.dot.version)
-  }
-
-  private func knownToHaveBeenDeleted(localNodes: [UUID: Node], dot: Dot) -> Bool {
-    if let creator = localNodes[dot.createdTime.node] {
-      return dot.createdTime.time < creator.minTime
-    }
-
-    return false
+  private func isDeleted(proxy: LiteCrate.TransactionProxy, dot: Dot) throws -> Bool {
+    try proxy
+      .fetch(EmptyRange.self, allWhere: "node = ?1 AND start <= ?2 AND ?2 <= end", [dot.creator, dot.createdTime])
+      .first != nil
   }
 
   private func merge<T: ReplicatingModel>(model _: T,
-                                          nodeID: UUID,
-                                          time: Int64,
+                                          nodeID _: UUID,
+                                          time _: Int64,
                                           localProxy: LiteCrate.TransactionProxy,
                                           payload: ReplicationPayload) throws
   {
-    let nodes = try localProxy.fetchIgnoringDelegate(Node.self)
-    let nodeDict = [UUID: Node](uniqueKeysWithValues: nodes.lazy.map { ($0.id, $0) })
-
     let remoteModels = payload.models[T.tableName]! // TODO: Throw error.
 
     for remoteModel in remoteModels {
-      if let localWitness = nodeDict[remoteModel.dot.witnessedTime.node],
-         localWitness.minTime > remoteModel.dot.witnessedTime.time
-      {
-        // This has been deleted.
+      guard try !isDeleted(proxy: localProxy, dot: remoteModel.dot) else {
         continue
       }
-
-      // If exact version exists locally, replace with remote model iff remote is newer.
-      //    Recall that deletions are always "newer"
-      if let sameVersionLocalModel = try getWithSameVersion(proxy: localProxy, model: remoteModel) {
-        if sameVersionLocalModel.dot < remoteModel.dot {
-          try localProxy.saveIgnoringDelegate(remoteModel)
-        }
+      // Get the local version; the one created later is the winner.
+      guard let localModel = try localProxy.fetch(T.self, with: remoteModel.id) else {
+        try localProxy.saveIgnoringDelegate(remoteModel)
         continue
       }
-
-      // Get the version created most recently and delete competing versions.
-      guard let localModel = try getActiveWithSameID(proxy: localProxy, model: remoteModel) else {
-        // TODO: If local dot does not exist, but we "would have known about it", then
-        // consider it deleted.
-        if !knownToHaveBeenDeleted(localNodes: nodeDict, dot: remoteModel.dot) {
-          try localProxy.saveIgnoringDelegate(remoteModel)
-        }
-
-        continue
-      }
-
-      // This is a new version.
-      try localProxy.saveIgnoringDelegate(remoteModel)
 
       if localModel.dot < remoteModel.dot {
-        try remoteModel.deleteCompetingModels(localProxy, time: time, node: nodeID)
-      } else {
-        try localModel.deleteCompetingModels(localProxy, time: time, node: nodeID)
+        if !localModel.dot.isSameVersion(as: remoteModel.dot) {
+          try localProxy.delete(localModel)
+        }
+        try localProxy.saveIgnoringDelegate(remoteModel)
       }
+      // TODO: If we're newer and different versions I think you could to EmptyRange -- but it would eventually get
+      // cleaned up after another round trip.
     }
   }
 }
 
-private func fetch<T: ReplicatingModel>(instance _: T, proxy: LiteCrate.TransactionProxy, nodes: [Node]) throws -> [any ReplicatingModel] {
+private func fetch<T: ReplicatingModel>(instance _: T, proxy: LiteCrate.TransactionProxy,
+                                        nodes: [Node]) throws -> [any ReplicatingModel]
+{
   var models: [T] = []
   for node in nodes {
     models.append(contentsOf: try proxy.fetchIgnoringDelegate(
       T.self,
-      allWhere: "witnessedNode = ? AND witnessedTime >= ?",
+      allWhere: "lastModifier = ? AND sequenceNumber >= ?",
       [node.id, node.time]
-    )
-    )
+    ))
   }
   return models
 }
 
-private func populate<T: ReplicatingModel>(instance _: T, proxy: LiteCrate.TransactionProxy, container: KeyedDecodingContainer<TableNameCodingKey>) throws {
+// TODO: somehow combine with above.
+private func fetchEmptyRanges(proxy: LiteCrate.TransactionProxy,
+                              nodes: [Node]) throws -> [EmptyRange]
+{
+  var ranges: [EmptyRange] = []
+  for node in nodes {
+    ranges.append(contentsOf: try proxy.fetchIgnoringDelegate(
+      EmptyRange.self,
+      allWhere: "lastModifier = ? AND sequenceNumber >= ?",
+      [node.id, node.time]
+    ))
+  }
+  return ranges
+}
+
+private func populate<T: ReplicatingModel>(
+  instance _: T,
+  proxy: LiteCrate.TransactionProxy,
+  container: KeyedDecodingContainer<TableNameCodingKey>
+) throws {
   let instances = try container.decode([T].self, forKey: TableNameCodingKey(stringValue: T.tableName))
   for instance in instances {
     try proxy.saveIgnoringDelegate(instance)

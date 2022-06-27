@@ -8,16 +8,20 @@
 import Foundation
 import LiteCrate
 
-public protocol ReplicatingModel: DatabaseCodable<UUID> {
+public protocol ReplicatingModel: DatabaseCodable<UUID>, Identifiable {
   var dot: Dot { get set }
 }
 
 public extension ReplicatingModel {
-  var primaryKeyValue: Key {
-    dot.version
-  }
-
-  static var primaryKeyColumn: String {
-    "version"
-  }
+  var id: UUID { dot.id }
 }
+
+// public extension ReplicatingModel {
+//  var primaryKeyValue: Key {
+//    dot.version
+//  }
+//
+//  static var primaryKeyColumn: String {
+//    "version"
+//  }
+// }

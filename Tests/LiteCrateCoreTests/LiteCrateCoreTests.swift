@@ -11,7 +11,10 @@ final class LiteCrateCoreTests: XCTestCase {
     let testUUID = UUID()
     let testData = "datadatadatablob".data(using: .utf8)!
     let testDate = Date()
-    try db.execute("INSERT INTO Test VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)", ["test", 12321, 3.14, testData, nil, testDate, testUUID, true, false])
+    try db.execute(
+      "INSERT INTO Test VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      ["test", 12321, 3.14, testData, nil, testDate, testUUID, true, false]
+    )
     let cursor = try db.query("SELECT a, b, c, d, e, f, g, h, i from TEST")
     XCTAssertTrue(cursor.step())
     XCTAssertEqual(cursor.string(for: 0), "test")
