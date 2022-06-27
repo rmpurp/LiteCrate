@@ -38,6 +38,7 @@ class ReplicationController: LiteCrateDelegate {
 
   func migration(didInitializeIn proxy: LiteCrate.TransactionProxy) throws {
     try proxy.execute("CREATE TABLE Node (id TEXT PRIMARY KEY, time INT NOT NULL, minTime INT NOT NULL)")
+    try proxy.execute(EmptyRange(node: UUID(), start: 0, end: 0, sequenceNumber: 0).creationStatement)
     try proxy.execute("INSERT INTO Node VALUES (?, 0, 0)", [nodeID])
   }
 
@@ -70,9 +71,11 @@ class ReplicationController: LiteCrateDelegate {
     return model
   }
 
-  func proxy<T: DatabaseCodable>(_: LiteCrate.TransactionProxy, willDelete model: T) throws -> T? {
+  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willDelete model: T) throws -> T? {
     if var model = model as? (any ReplicatingModel) {
       model.dot.delete(modifiedBy: nodeID, at: time, transactionTime: transactionTime)
+      let emptyRange = EmptyRange(node: nodeID, start: time, end: time, sequenceNumber: transactionTime)
+      try addAndMerge(proxy, range: emptyRange)
       time += 1
       return (model as! T)
     }
@@ -85,6 +88,25 @@ class ReplicationController: LiteCrateDelegate {
       clocks = try proxy.fetch(Node.self)
     }
     return clocks
+  }
+}
+
+extension ReplicationController {
+  func addAndMerge(_ proxy: LiteCrate.TransactionProxy, range: EmptyRange) throws {
+    var range = range
+    let conflictingRanges = try proxy.fetch(
+      EmptyRange.self,
+      allWhere: "node = ? AND start <= ? AND end >= ?",
+      [range.node, range.end + 1, range.start - 1]
+    )
+
+    for conflictingRange in conflictingRanges {
+      range.start = min(range.start, conflictingRange.start)
+      range.end = max(range.end, conflictingRange.end)
+      try proxy.delete(range)
+    }
+
+    try proxy.save(range)
   }
 }
 
