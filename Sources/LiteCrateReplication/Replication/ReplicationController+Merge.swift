@@ -46,8 +46,8 @@ extension ReplicationController {
   }
 
   private func knownToHaveBeenDeleted(localNodes: [UUID: Node], dot: Dot) -> Bool {
-    if let creator = localNodes[dot.createdTime.node] {
-      return dot.createdTime.time < creator.minTime
+    if let creator = localNodes[dot.creator] {
+      return dot.createdTime < creator.minTime
     }
 
     return false
@@ -65,8 +65,8 @@ extension ReplicationController {
     let remoteModels = payload.models[T.tableName]! // TODO: Throw error.
 
     for remoteModel in remoteModels {
-      if let localWitness = nodeDict[remoteModel.dot.witnessedTime.node],
-         localWitness.minTime > remoteModel.dot.witnessedTime.time
+      if let localWitness = nodeDict[remoteModel.dot.lastModifier],
+         localWitness.minTime > remoteModel.dot.sequenceNumber
       {
         // This has been deleted.
         continue

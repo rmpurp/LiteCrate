@@ -8,11 +8,6 @@
 import Foundation
 import LiteCrate
 
-public struct Timestamp: Equatable, Codable {
-  var time: Int64
-  var node: UUID
-}
-
 public struct Dot: Codable {
   /// The version of the model that was generated when it was first created.
   var version: UUID
@@ -22,7 +17,7 @@ public struct Dot: Codable {
   /// The node that created the model.
   private(set) var creator: Node.Key
   /// The time (WRT to the creator) at which the model was created.
-  private(set) var createdTime_: Int64
+  private(set) var createdTime: Int64
   /// The last node to modify the model.
   private(set) var lastModifier: Node.Key
   /// The time (WRT the lastModifier) that the model was last updated; for efficient delta updates only.
@@ -39,7 +34,7 @@ public struct Dot: Codable {
     version = UUID()
     self.id = id
     creator = UUID()
-    createdTime_ = -1
+    createdTime = -1
     lastModifier = UUID()
     sequenceNumber = -1
     lamportClock = -1
@@ -49,27 +44,15 @@ public struct Dot: Codable {
 
   var isDeleted: Bool = false
 
-  var createdTime: Timestamp {
-    Timestamp(time: createdTime_, node: creator)
-  }
-
-  var modifiedTime: Timestamp {
-    Timestamp(time: sequenceNumber, node: lastModifier)
-  }
-
-  var witnessedTime: Timestamp {
-    Timestamp(time: sequenceNumber, node: lastModifier)
-  }
-
   var isInitialized: Bool {
-    createdTime_ >= 0
+    createdTime >= 0
   }
 
   // MARK: - CRUD
 
   mutating func update(modifiedBy node: UUID, at time: Int64) {
     if !isInitialized {
-      createdTime_ = time
+      createdTime = time
       creator = node
       lamportClock = 0
     } else {
@@ -81,7 +64,7 @@ public struct Dot: Codable {
 
   mutating func delete(modifiedBy node: UUID, at time: Int64) {
     if !isInitialized {
-      createdTime_ = time
+      createdTime = time
       creator = node
     }
     isDeleted = true
@@ -103,10 +86,10 @@ public struct Dot: Codable {
 
       return lhs.sequenceNumber < rhs.sequenceNumber
     } else {
-      if lhs.createdTime_ == rhs.createdTime_ {
+      if lhs.createdTime == rhs.createdTime {
         return lhs.creator.uuidString < rhs.creator.uuidString
       }
-      return lhs.createdTime_ < rhs.createdTime_
+      return lhs.createdTime < rhs.createdTime
     }
   }
 }
