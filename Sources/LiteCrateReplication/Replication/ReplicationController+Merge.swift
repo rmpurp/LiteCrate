@@ -23,7 +23,6 @@ extension ReplicationController {
 
       ranges.append(contentsOf: try fetchEmptyRanges(proxy: proxy, nodes: nodesForFetching))
     }
-    // TODO: Fetch ranges
     return ReplicationPayload(models: models, nodes: localNodes, ranges: ranges)
   }
 
@@ -37,6 +36,9 @@ extension ReplicationController {
       for node in Node.mergeForDecoding(nodeID: nodeID, localNodes: localNodes, remoteNodes: payload.nodes) {
         try localProxy.saveIgnoringDelegate(node)
       }
+      for emptyRange in payload.ranges {
+        try addAndMerge(localProxy, range: emptyRange, deleteModels: true)
+      }
     }
   }
 
@@ -49,12 +51,10 @@ extension ReplicationController {
     try proxy.fetchIgnoringDelegate(T.self, with: model.dot.version)
   }
 
-  private func knownToHaveBeenDeleted(localNodes: [UUID: Node], dot: Dot) -> Bool {
-    if let creator = localNodes[dot.creator] {
-      return dot.createdTime < creator.minTime
-    }
-
-    return false
+  private func isDeleted(_ proxy: LiteCrate.TransactionProxy, dot: Dot) throws -> Bool {
+    try proxy
+      .fetch(EmptyRange.self, allWhere: "node = ?1 AND start <= ?2 AND ?2 <= end", [dot.creator, dot.createdTime])
+      .first != nil
   }
 
   private func merge<T: ReplicatingModel>(model _: T,
@@ -63,19 +63,9 @@ extension ReplicationController {
                                           localProxy: LiteCrate.TransactionProxy,
                                           payload: ReplicationPayload) throws
   {
-    let nodes = try localProxy.fetchIgnoringDelegate(Node.self)
-    let nodeDict = [UUID: Node](uniqueKeysWithValues: nodes.lazy.map { ($0.id, $0) })
-
     let remoteModels = payload.models[T.tableName]! // TODO: Throw error.
 
     for remoteModel in remoteModels {
-      if let localWitness = nodeDict[remoteModel.dot.lastModifier],
-         localWitness.minTime > remoteModel.dot.sequenceNumber
-      {
-        // This has been deleted.
-        continue
-      }
-
       // If exact version exists locally, replace with remote model iff remote is newer.
       //    Recall that deletions are always "newer"
       if let sameVersionLocalModel = try getWithSameVersion(proxy: localProxy, model: remoteModel) {
@@ -89,7 +79,7 @@ extension ReplicationController {
       guard let localModel = try getActiveWithSameID(proxy: localProxy, model: remoteModel) else {
         // TODO: If local dot does not exist, but we "would have known about it", then
         // consider it deleted.
-        if !knownToHaveBeenDeleted(localNodes: nodeDict, dot: remoteModel.dot) {
+        if try !isDeleted(localProxy, dot: remoteModel.dot) {
           try localProxy.saveIgnoringDelegate(remoteModel)
         }
 

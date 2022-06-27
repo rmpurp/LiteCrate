@@ -92,7 +92,7 @@ class ReplicationController: LiteCrateDelegate {
 }
 
 extension ReplicationController {
-  func addAndMerge(_ proxy: LiteCrate.TransactionProxy, range: EmptyRange) throws {
+  func addAndMerge(_ proxy: LiteCrate.TransactionProxy, range: EmptyRange, deleteModels: Bool = false) throws {
     var range = range
     let conflictingRanges = try proxy.fetch(
       EmptyRange.self,
@@ -106,7 +106,27 @@ extension ReplicationController {
       try proxy.delete(range)
     }
 
+    if deleteModels {
+      for instance in exampleInstances {
+        try deleteAll(proxy, withSameTypeAs: instance, in: range)
+      }
+    }
+
     try proxy.save(range)
+  }
+
+  private func deleteAll<T: ReplicatingModel>(_ proxy: LiteCrate.TransactionProxy, withSameTypeAs _: T,
+                                              in range: EmptyRange) throws
+  {
+    let models = try proxy.fetch(
+      T.self,
+      allWhere: "creator = ? AND ? <= createdTime AND createdTime <= ?",
+      [range.node, range.start, range.end]
+    )
+    
+    for model in models {
+      try proxy.deleteIgnoringDelegate(model)
+    }
   }
 }
 
