@@ -28,7 +28,6 @@ final class DotTests: XCTestCase {
     try db.inTransaction { proxy in
       try proxy.save(boss1)
       let boss1Fetched = try proxy.fetch(Boss.self, with: boss1.primaryKeyValue)!
-      XCTAssertEqual(boss1Fetched.dot.version, boss1.dot.version)
       XCTAssertEqual(boss1Fetched.dot.id, boss1.dot.id)
 //      XCTAssertEqual(boss1Fetched.dot.witnessedTime, Timestamp(time: 0, node: db.nodeID))
 //      XCTAssertEqual(boss1Fetched.dot.modifiedTime, Timestamp(time: 0, node: db.nodeID))
@@ -41,7 +40,6 @@ final class DotTests: XCTestCase {
       try proxy.save(boss1Fetched)
 
       boss1Fetched = try proxy.fetch(Boss.self, with: boss1.primaryKeyValue)!
-      XCTAssertEqual(boss1Fetched.dot.version, boss1.dot.version)
       XCTAssertEqual(boss1Fetched.dot.id, boss1.dot.id)
 //      XCTAssertEqual(boss1Fetched.dot.witness, db.nodeID)
 //      XCTAssertEqual(boss1Fetched.dot.lastModifier, db.nodeID)

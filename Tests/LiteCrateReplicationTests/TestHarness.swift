@@ -23,8 +23,9 @@ struct CreateDatabase: TestAction {
   let databaseID: Int
 
   func perform(_ harness: TestHarness) throws {
-    print("Creating database with id \(databaseID)")
-    harness.databases[databaseID] = try ReplicationController(location: ":memory:", nodeID: UUID()) {
+    let id = UUID()
+    print("Creating database with id \(databaseID) -> \(id)")
+    harness.databases[databaseID] = try ReplicationController(location: ":memory:", nodeID: id) {
       CreateReplicatingTable(TestModel(value: 0))
     }
   }

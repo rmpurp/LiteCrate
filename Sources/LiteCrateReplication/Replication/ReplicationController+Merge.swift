@@ -43,58 +43,38 @@ extension ReplicationController {
     }
   }
 
-  /// If it exists, get the dot corresponding to the model with the same id and not null.
-  private func getActiveWithSameID<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, model: T) throws -> T? {
-    try proxy.fetchIgnoringDelegate(T.self, allWhere: "isDeleted = FALSE AND id = ?", [model.dot.id]).first
-  }
-
-  private func getWithSameVersion<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, model: T) throws -> T? {
-    try proxy.fetchIgnoringDelegate(T.self, with: model.dot.version)
-  }
-
-  private func isDeleted(_ proxy: LiteCrate.TransactionProxy, dot: Dot) throws -> Bool {
+  private func isDeleted(proxy: LiteCrate.TransactionProxy, dot: Dot) throws -> Bool {
     try proxy
       .fetch(EmptyRange.self, allWhere: "node = ?1 AND start <= ?2 AND ?2 <= end", [dot.creator, dot.createdTime])
       .first != nil
   }
 
   private func merge<T: ReplicatingModel>(model _: T,
-                                          nodeID: UUID,
-                                          time: Int64,
+                                          nodeID _: UUID,
+                                          time _: Int64,
                                           localProxy: LiteCrate.TransactionProxy,
                                           payload: ReplicationPayload) throws
   {
     let remoteModels = payload.models[T.tableName]! // TODO: Throw error.
 
     for remoteModel in remoteModels {
-      // If exact version exists locally, replace with remote model iff remote is newer.
-      //    Recall that deletions are always "newer"
-      if let sameVersionLocalModel = try getWithSameVersion(proxy: localProxy, model: remoteModel) {
-        if sameVersionLocalModel.dot < remoteModel.dot {
-          try localProxy.saveIgnoringDelegate(remoteModel)
-        }
+      guard try !isDeleted(proxy: localProxy, dot: remoteModel.dot) else {
         continue
       }
-
-      // Get the version created most recently and delete competing versions.
-      guard let localModel = try getActiveWithSameID(proxy: localProxy, model: remoteModel) else {
-        // TODO: If local dot does not exist, but we "would have known about it", then
-        // consider it deleted.
-        if try !isDeleted(localProxy, dot: remoteModel.dot) {
-          try localProxy.saveIgnoringDelegate(remoteModel)
-        }
-
+      // Get the local version; the one created later is the winner.
+      guard let localModel = try localProxy.fetch(T.self, with: remoteModel.id) else {
+        try localProxy.saveIgnoringDelegate(remoteModel)
         continue
       }
-
-      // This is a new version.
-      try localProxy.saveIgnoringDelegate(remoteModel)
 
       if localModel.dot < remoteModel.dot {
-        try remoteModel.deleteCompetingModels(localProxy, time: time, node: nodeID)
-      } else {
-        try localModel.deleteCompetingModels(localProxy, time: time, node: nodeID)
+        if !localModel.dot.isSameVersion(as: remoteModel.dot) {
+          try localProxy.delete(localModel)
+        }
+        try localProxy.saveIgnoringDelegate(remoteModel)
       }
+      // TODO: If we're newer and different versions I think you could to EmptyRange -- but it would eventually get
+      // cleaned up after another round trip.
     }
   }
 }

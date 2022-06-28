@@ -31,11 +31,6 @@ class ReplicationController: LiteCrateDelegate {
     try liteCrate.inTransaction(block: block)
   }
 
-  func filter<T>(model: T) throws -> Bool where T: DatabaseCodable {
-    guard let model = model as? any ReplicatingModel else { return true }
-    return !model.dot.isDeleted
-  }
-
   func migration(didInitializeIn proxy: LiteCrate.TransactionProxy) throws {
     try proxy.execute("CREATE TABLE Node (id TEXT PRIMARY KEY, time INT NOT NULL, minTime INT NOT NULL)")
     try proxy
@@ -60,11 +55,8 @@ class ReplicationController: LiteCrateDelegate {
     try proxy.execute("UPDATE Node SET time = ? WHERE id = ?", [time, nodeID])
   }
 
-  func proxy<T>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws -> T where T: DatabaseCodable {
+  func proxy<T>(_: LiteCrate.TransactionProxy, willSave model: T) throws -> T where T: DatabaseCodable {
     if var model = model as? any ReplicatingModel {
-      if !model.dot.isDeleted {
-        try model.deleteCompetingModels(proxy, time: time, node: nodeID)
-      }
       model.dot.update(modifiedBy: nodeID, at: time, transactionTime: transactionTime)
       time += 1
       return model as! T
@@ -115,7 +107,6 @@ extension ReplicationController {
         try deleteAll(proxy, withSameTypeAs: instance, in: range)
       }
     }
-
     try proxy.save(range)
   }
 
@@ -131,23 +122,5 @@ extension ReplicationController {
     for model in models {
       try proxy.deleteIgnoringDelegate(model)
     }
-  }
-}
-
-// Extension because generic sadness
-extension ReplicatingModel {
-  /// Delete models with the same id but a different version.
-  /// time: the current time to update the time witnessed to
-  /// node: the witness
-  func deleteCompetingModels(_ proxy: LiteCrate.TransactionProxy, time: Int64, node: UUID) throws {
-    // Avoid recursively calling delegate methods by updating rows directly
-    let query = """
-    UPDATE \(Self.tableName)
-        SET isDeleted = TRUE,
-            sequenceNumber = ?,
-            lastModifier = ?
-        WHERE id = ? AND version <> ?
-    """
-    try proxy.execute(query, [time, node, dot.id, dot.version])
   }
 }

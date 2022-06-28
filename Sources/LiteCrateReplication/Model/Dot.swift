@@ -9,8 +9,6 @@ import Foundation
 import LiteCrate
 
 public struct Dot: Codable {
-  /// The version of the model that was generated when it was first created.
-  var version: UUID
   /// The stable id of the model.
   var id: UUID
 
@@ -31,7 +29,6 @@ public struct Dot: Codable {
   }
 
   init(id: UUID) {
-    version = UUID()
     self.id = id
     creator = UUID()
     createdTime = -1
@@ -39,10 +36,6 @@ public struct Dot: Codable {
     sequenceNumber = -1
     lamportClock = -1
   }
-
-  // MARK: - Shims
-
-  var isDeleted: Bool = false
 
   var isInitialized: Bool {
     createdTime >= 0
@@ -62,35 +55,18 @@ public struct Dot: Codable {
     lastModifier = node
   }
 
-  mutating func delete(modifiedBy node: UUID, at time: Int64, transactionTime: Int64) {
-    if !isInitialized {
-      createdTime = time
-      creator = node
-    }
-    isDeleted = true
-    sequenceNumber = transactionTime
-    lastModifier = node
-  }
-
   static func < (lhs: Self, rhs: Self) -> Bool {
     // Deletions always "newer" aka greater
     precondition(lhs.id == rhs.id, "These Dots are not comparable as they have different stable ids.")
 
-    if lhs.isDeleted, rhs.isDeleted {
-      return false
+    if lhs.lamportClock == rhs.lamportClock {
+      return lhs.creator.uuidString < rhs.creator.uuidString
     }
+    return lhs.lamportClock < rhs.lamportClock
+  }
 
-    if lhs.version == rhs.version {
-      guard !lhs.isDeleted else { return false }
-      guard !rhs.isDeleted else { return true } // rhs deleted, so "newer"
-
-      return lhs.sequenceNumber < rhs.sequenceNumber
-    } else {
-      if lhs.createdTime == rhs.createdTime {
-        return lhs.creator.uuidString < rhs.creator.uuidString
-      }
-      return lhs.createdTime < rhs.createdTime
-    }
+  func isSameVersion(as otherDot: Dot) -> Bool {
+    creator == otherDot.creator && createdTime == otherDot.createdTime
   }
 }
 
