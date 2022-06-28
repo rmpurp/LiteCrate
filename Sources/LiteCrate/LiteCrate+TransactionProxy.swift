@@ -122,11 +122,20 @@ public extension LiteCrate {
       try delete(model)
     }
 
-    public func delete<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
-                                           _ values: [SqliteRepresentable?] = []) throws
+    public func deleteIgnoringDelegate<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
+                                                           _ values: [SqliteRepresentable?] = []) throws
     {
       let sqlWhereClause = sqlWhereClause.flatMap { "WHERE \($0)" } ?? ""
       try db.execute("DELETE FROM \(T.tableName) \(sqlWhereClause)", values)
+    }
+
+    public func delete<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
+                                           _ values: [SqliteRepresentable?] = []) throws
+    {
+      let models = try fetch(T.self, allWhere: sqlWhereClause, values)
+      for model in models {
+        try delete(model)
+      }
     }
 
     internal var db: Database

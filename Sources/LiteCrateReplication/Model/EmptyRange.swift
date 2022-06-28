@@ -32,3 +32,15 @@ struct EmptyRange: DatabaseCodable, Identifiable {
     self.sequenceNumber = sequenceNumber
   }
 }
+
+extension EmptyRange: CustomDebugStringConvertible {
+  var debugDescription: String {
+    "EmptyRange(id:\(id.short), node:\(node.short), \(start)->\(end), lastModifier:\(lastModifier.short), seqNum:\(sequenceNumber))"
+  }
+}
+
+private extension UUID {
+  var short: String {
+    String(uuidString.prefix(4))
+  }
+}

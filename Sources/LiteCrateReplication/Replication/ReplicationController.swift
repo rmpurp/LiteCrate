@@ -110,7 +110,7 @@ extension ReplicationController {
     for conflictingRange in conflictingRanges {
       range.start = min(range.start, conflictingRange.start)
       range.end = max(range.end, conflictingRange.end)
-      try proxy.delete(range)
+      try proxy.deleteIgnoringDelegate(conflictingRange)
     }
 
     if deleteModels {
