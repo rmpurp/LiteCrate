@@ -74,7 +74,7 @@ class ReplicationController: LiteCrateDelegate {
         sequenceNumber: transactionTime
       )
       try addAndMerge(proxy, range: emptyRange)
-      
+
       // Make deletion increment time, which necessitates adding an EmptyRange at the old time.
       let placeholderRange = EmptyRange(
         node: nodeID,

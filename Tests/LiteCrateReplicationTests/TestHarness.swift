@@ -21,7 +21,7 @@ struct TestModel: ReplicatingModel {
 
 struct CreateDatabase: TestAction {
   let databaseID: Int
-  
+
   func uuid(for id: Int) -> UUID {
     switch id {
     case 0: return UUID(uuidString: "073CFDC3-67AF-471D-AE9F-B0B032AEF859")!

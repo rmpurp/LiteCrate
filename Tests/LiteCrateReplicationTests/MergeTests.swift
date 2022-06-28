@@ -15,7 +15,7 @@ final class MergeTests: XCTestCase {
     try testActions {
       CreateDatabase(databaseID: 0)
       CreateDatabase(databaseID: 1)
-      
+
       // Merge in and reject other
       Add(databaseID: 0, value: 0, id: 0)
       Add(databaseID: 0, value: 1, id: 0)
@@ -23,7 +23,7 @@ final class MergeTests: XCTestCase {
       Verify(databaseID: 1, values: [1])
       Merge(fromID: 1, toID: 0)
       Verify(databaseID: 0, values: [1])
-      
+
       // Merge in and accept other
       Add(databaseID: 0, value: 2, id: 1)
       Verify(databaseID: 0, values: [1, 2])
@@ -33,7 +33,7 @@ final class MergeTests: XCTestCase {
       Verify(databaseID: 0, values: [1, 3])
       Merge(fromID: 0, toID: 1)
       Verify(databaseID: 1, values: [1, 3])
-      
+
       // Higher lamport trumps id.
       Add(databaseID: 0, value: 4, id: 2)
       Modify(databaseID: 0, oldValue: 4, newValue: 4)
@@ -42,7 +42,7 @@ final class MergeTests: XCTestCase {
       Verify(databaseID: 1, values: [1, 3, 4])
       Merge(fromID: 1, toID: 0)
       Verify(databaseID: 0, values: [1, 3, 4])
-      
+
       // Higher lamport trumps id.
       Add(databaseID: 0, value: 6, id: 3)
       Modify(databaseID: 0, oldValue: 6, newValue: 6)
@@ -53,7 +53,7 @@ final class MergeTests: XCTestCase {
       Verify(databaseID: 1, values: [1, 3, 4, 6])
     }
   }
-  
+
   func testMerge() throws {
     try testActions {
       CreateDatabase(databaseID: 0)
