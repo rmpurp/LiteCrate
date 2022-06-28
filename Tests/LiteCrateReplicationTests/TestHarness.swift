@@ -21,9 +21,19 @@ struct TestModel: ReplicatingModel {
 
 struct CreateDatabase: TestAction {
   let databaseID: Int
+  
+  func uuid(for id: Int) -> UUID {
+    switch id {
+    case 0: return UUID(uuidString: "073CFDC3-67AF-471D-AE9F-B0B032AEF859")!
+    case 1: return UUID(uuidString: "1C5CE18C-7891-4CD6-910B-A981386ECE48")!
+    case 2: return UUID(uuidString: "2E18F5A3-88EA-4A74-BDD7-3754DD0AE950")!
+    case 3: return UUID(uuidString: "3FB373D3-EEBF-42B8-AE5A-B91A7758E00F")!
+    default: return UUID()
+    }
+  }
 
   func perform(_ harness: TestHarness) throws {
-    let id = UUID()
+    let id = uuid(for: databaseID)
     print("Creating database with id \(databaseID) -> \(id)")
     harness.databases[databaseID] = try ReplicationController(location: ":memory:", nodeID: id) {
       CreateReplicatingTable(TestModel(value: 0))

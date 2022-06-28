@@ -11,6 +11,49 @@ import XCTest
 
 // TODO: Test node id tie-breaking
 final class MergeTests: XCTestCase {
+  func testDatabaseIDTiebreaker() throws {
+    try testActions {
+      CreateDatabase(databaseID: 0)
+      CreateDatabase(databaseID: 1)
+      
+      // Merge in and reject other
+      Add(databaseID: 0, value: 0, id: 0)
+      Add(databaseID: 0, value: 1, id: 0)
+      Merge(fromID: 0, toID: 1)
+      Verify(databaseID: 1, values: [1])
+      Merge(fromID: 1, toID: 0)
+      Verify(databaseID: 0, values: [1])
+      
+      // Merge in and accept other
+      Add(databaseID: 0, value: 2, id: 1)
+      Verify(databaseID: 0, values: [1, 2])
+      Add(databaseID: 1, value: 3, id: 1)
+      Verify(databaseID: 1, values: [1, 3])
+      Merge(fromID: 1, toID: 0)
+      Verify(databaseID: 0, values: [1, 3])
+      Merge(fromID: 0, toID: 1)
+      Verify(databaseID: 1, values: [1, 3])
+      
+      // Higher lamport trumps id.
+      Add(databaseID: 0, value: 4, id: 2)
+      Modify(databaseID: 0, oldValue: 4, newValue: 4)
+      Add(databaseID: 1, value: 5, id: 2)
+      Merge(fromID: 0, toID: 1)
+      Verify(databaseID: 1, values: [1, 3, 4])
+      Merge(fromID: 1, toID: 0)
+      Verify(databaseID: 0, values: [1, 3, 4])
+      
+      // Higher lamport trumps id.
+      Add(databaseID: 0, value: 6, id: 3)
+      Modify(databaseID: 0, oldValue: 6, newValue: 6)
+      Add(databaseID: 1, value: 7, id: 3)
+      Merge(fromID: 1, toID: 0)
+      Verify(databaseID: 0, values: [1, 3, 4, 6])
+      Merge(fromID: 0, toID: 1)
+      Verify(databaseID: 1, values: [1, 3, 4, 6])
+    }
+  }
+  
   func testMerge() throws {
     try testActions {
       CreateDatabase(databaseID: 0)
