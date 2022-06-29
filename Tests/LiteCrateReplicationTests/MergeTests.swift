@@ -123,4 +123,37 @@ final class MergeTests: XCTestCase {
       Verify(databaseID: 1, values: [11, 12, 101, 102])
     }
   }
+
+  func testForeignKey() throws {
+    try testActions {
+      CreateDatabase(databaseID: 0)
+      CreateDatabase(databaseID: 1)
+      Add(databaseID: 0, value: 0)
+      Add(databaseID: 0, value: 1)
+      AddChild(databaseID: 0, value: 0, parentValue: 0)
+      AddChild(databaseID: 0, value: 1, parentValue: 0)
+      AddChild(databaseID: 0, value: 2, parentValue: 0)
+      VerifyChildren(databaseID: 0, values: [0, 1, 2])
+      AddChild(databaseID: 0, value: 3, parentValue: 1)
+      AddChild(databaseID: 0, value: 4, parentValue: 1)
+      VerifyChildren(databaseID: 0, values: [0, 1, 2, 3, 4])
+
+      Merge(fromID: 0, toID: 1)
+      Verify(databaseID: 1, values: [0, 1])
+      VerifyChildren(databaseID: 1, values: [0, 1, 2, 3, 4])
+      Delete(databaseID: 1, value: 0)
+      VerifyChildren(databaseID: 1, values: [3, 4])
+      AddChild(databaseID: 0, value: 5, parentValue: 0)
+      VerifyChildren(databaseID: 0, values: [0, 1, 2, 3, 4, 5])
+      AddChild(databaseID: 1, value: 6, parentValue: 1)
+
+      Merge(fromID: 1, toID: 0)
+      Verify(databaseID: 0, values: [1])
+      VerifyChildren(databaseID: 0, values: [3, 4, 6])
+      Delete(databaseID: 0, value: 1)
+      VerifyChildren(databaseID: 0, values: [])
+      Merge(fromID: 0, toID: 1)
+      VerifyChildren(databaseID: 1, values: [])
+    }
+  }
 }

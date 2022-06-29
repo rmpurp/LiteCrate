@@ -73,7 +73,7 @@ class ReplicationController: LiteCrateDelegate {
         lastModifier: nodeID,
         sequenceNumber: transactionTime
       )
-      try addAndMerge(proxy, range: emptyRange)
+      try addAndMerge(proxy, range: emptyRange, deleteModels: model.isParent)
 
       // Make deletion increment time, which necessitates adding an EmptyRange at the old time.
       let placeholderRange = EmptyRange(
@@ -84,8 +84,10 @@ class ReplicationController: LiteCrateDelegate {
         sequenceNumber: transactionTime
       )
       try addAndMerge(proxy, range: placeholderRange)
+
       time += 1
     }
+
     return nil
   }
 
@@ -121,9 +123,21 @@ extension ReplicationController {
     try proxy.save(range)
   }
 
-  private func deleteAll<T: ReplicatingModel>(_ proxy: LiteCrate.TransactionProxy, withSameTypeAs _: T,
+  private func deleteAll<T: ReplicatingModel>(_ proxy: LiteCrate.TransactionProxy, withSameTypeAs instance: T,
                                               in range: EmptyRange) throws
   {
+    if instance is (any ChildReplicatingModel) {
+      let childModels = try proxy.fetch(
+        T.self,
+        allWhere: "parentCreator = ? AND ? <= parentCreatedTime AND parentCreatedTime <= ?",
+        [range.node, range.start, range.end]
+      )
+
+      for model in childModels {
+        try proxy.delete(model) // Actual delete so we mark the child dot as deleted.
+      }
+    }
+
     let models = try proxy.fetch(
       T.self,
       allWhere: "creator = ? AND ? <= createdTime AND createdTime <= ?",

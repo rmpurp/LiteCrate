@@ -17,6 +17,24 @@ protocol TestAction {
 struct TestModel: ReplicatingModel {
   var value: Int64
   var dot: Dot = .init()
+  var isParent: Bool = true
+}
+
+struct ChildModel: ChildReplicatingModel {
+  var parentDot: LiteCrateReplication.ForeignKeyDot
+  var parent: TestModel.Key
+  var value: Int64
+  var dot: Dot = .init()
+
+  init(value: Int64, parent: TestModel) {
+    self.value = value
+    parentDot = ForeignKeyDot(parent: parent)
+    self.parent = parent.id
+  }
+
+  static var foreignKeys: [ForeignKey] {
+    [.init("parent", references: "TestModel", targetColumn: "id")]
+  }
 }
 
 struct CreateDatabase: TestAction {
@@ -37,6 +55,56 @@ struct CreateDatabase: TestAction {
     print("Creating database with id \(databaseID) -> \(id)")
     harness.databases[databaseID] = try ReplicationController(location: ":memory:", nodeID: id) {
       CreateReplicatingTable(TestModel(value: 0))
+      CreateReplicatingTable(ChildModel(value: 0, parent: TestModel(value: 0)))
+    }
+  }
+}
+
+struct AddChild: TestAction {
+  let databaseID: Int
+  let value: Int64
+  let parentValue: Int64
+  let id: Int?
+
+  init(databaseID: Int, value: Int64, parentValue: Int64, id: Int? = nil) {
+    self.databaseID = databaseID
+    self.value = value
+    self.parentValue = parentValue
+    self.id = id
+  }
+
+  func perform(_ harness: TestHarness) throws {
+    print("Adding \(value) to database \(databaseID)")
+    try harness.databases[databaseID]!.inTransaction { proxy in
+      let parent = try proxy.fetch(TestModel.self, allWhere: "value = ?", [parentValue]).first!
+      var child = ChildModel(value: value, parent: parent)
+
+      if let id = id {
+        if let uuid = harness.childIDMap[id] {
+          child.dot.id = uuid
+        } else {
+          let uuid = UUID()
+          harness.childIDMap[id] = uuid
+          child.dot.id = uuid
+        }
+      }
+      try proxy.save(child)
+    }
+  }
+}
+
+struct DeleteChild: TestAction {
+  let databaseID: Int
+  let value: Int64
+
+  func perform(_ harness: TestHarness) throws {
+    print("Deleting child \(value) from database \(databaseID)")
+    try harness.databases[databaseID]!.inTransaction { proxy in
+      guard let model = try proxy.fetch(ChildModel.self, allWhere: "value = ?", [value]).first else {
+        XCTFail("Could not fetch model for delete with value \(value)")
+        return
+      }
+      try proxy.delete(model)
     }
   }
 }
@@ -167,6 +235,30 @@ struct Verify: TestAction {
   }
 }
 
+struct VerifyChildren: TestAction {
+  let databaseID: Int
+  let values: [Int64]
+  let debugValue: Int
+  let file: StaticString
+  let line: UInt
+
+  init(databaseID: Int, values: [Int64], debugValue: Int = -1, file: StaticString = #filePath, line: UInt = #line) {
+    self.databaseID = databaseID
+    self.values = values
+    self.debugValue = debugValue
+    self.file = file
+    self.line = line
+  }
+
+  func perform(_ harness: TestHarness) throws {
+    print("Verifying \(databaseID) contains \(values) for children")
+    try harness.databases[databaseID]!.inTransaction { proxy in
+      let actualValues = try proxy.fetch(ChildModel.self).map(\.value)
+      XCTAssertEqual(values.sorted(), actualValues.sorted(), file: self.file, line: self.line)
+    }
+  }
+}
+
 @resultBuilder
 enum TestBuilder {
   static func buildBlock(_ components: TestAction...) -> [TestAction] {
@@ -177,6 +269,7 @@ enum TestBuilder {
 class TestHarness {
   var databases = [Int: ReplicationController]()
   var idMap = [Int: UUID]()
+  var childIDMap = [Int: UUID]()
   var actions: [TestAction]
   init(@TestBuilder actions: () -> [TestAction]) {
     self.actions = actions()

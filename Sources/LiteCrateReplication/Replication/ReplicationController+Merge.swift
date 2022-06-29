@@ -43,9 +43,27 @@ extension ReplicationController {
     }
   }
 
-  private func isDeleted(proxy: LiteCrate.TransactionProxy, dot: Dot) throws -> Bool {
-    try proxy
-      .fetch(EmptyRange.self, allWhere: "node = ?1 AND start <= ?2 AND ?2 <= end", [dot.creator, dot.createdTime])
+  private func isDeleted<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, model: T) throws -> Bool {
+    if let model = model as? any ChildReplicatingModel {
+      // Check if parent was deleted.
+      if try proxy
+        .fetch(
+          EmptyRange.self,
+          allWhere: "node = ?1 AND start <= ?2 AND ?2 <= end",
+          [model.parentDot.parentCreator, model.parentDot.parentCreatedTime]
+        )
+        .first != nil
+      {
+        return true
+      }
+    }
+    // Check if the model itself was deleted.
+    return try proxy
+      .fetch(
+        EmptyRange.self,
+        allWhere: "node = ?1 AND start <= ?2 AND ?2 <= end",
+        [model.dot.creator, model.dot.createdTime]
+      )
       .first != nil
   }
 
@@ -58,7 +76,7 @@ extension ReplicationController {
     let remoteModels = payload.models[T.tableName]! // TODO: Throw error.
 
     for remoteModel in remoteModels {
-      guard try !isDeleted(proxy: localProxy, dot: remoteModel.dot) else {
+      guard try !isDeleted(proxy: localProxy, model: remoteModel) else {
         continue
       }
       // Get the local version; the one created later is the winner.
