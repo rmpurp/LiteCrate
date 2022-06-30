@@ -5,8 +5,8 @@
 //  Created by Ryan Purpura on 6/22/22.
 //
 
-@testable import LiteCrateReplication
 @testable import LiteCrate
+@testable import LiteCrateReplication
 import XCTest
 
 private struct Parent: ReplicatingModel {
@@ -20,17 +20,17 @@ private struct Child: ChildReplicatingModel {
   var parent: Parent.Key
   var parentDot: ForeignKeyDot
   var value: String
-  
+
   init(dot: Dot = Dot(), parent: Parent, value: String) {
     self.dot = dot
     self.parent = parent.id
-    self.parentDot = ForeignKeyDot(parent: parent)
+    parentDot = ForeignKeyDot(parent: parent)
     self.value = value
   }
-  
+
   static var foreignKeys: [ForeignKey] {
     [
-      ForeignKey("parent", references: "Parent", targetColumn: "id", onDelete: .noAction)
+      ForeignKey("parent", references: "Parent", targetColumn: "id", onDelete: .noAction),
     ]
   }
 }
@@ -41,13 +41,13 @@ final class ForeignKeyTests: XCTestCase {
       CreateReplicatingTable(Parent(value: 0))
       CreateReplicatingTable(Child(parent: Parent(value: 0), value: ""))
     }
-    
+
     var parent = Parent(value: 0)
     try controller.inTransaction { proxy in
       try proxy.save(parent)
       parent = try proxy.fetch(Parent.self, with: parent.id)!
     }
-    
+
     let child = Child(parent: parent, value: "0")
     let child2 = Child(parent: parent, value: "2")
 

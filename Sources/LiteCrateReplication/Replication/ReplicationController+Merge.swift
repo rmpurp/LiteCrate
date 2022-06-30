@@ -47,14 +47,23 @@ extension ReplicationController {
     if let model = model as? any ChildReplicatingModel {
       // Check if parent was deleted.
       if try proxy
-        .fetch(EmptyRange.self, allWhere: "node = ?1 AND start <= ?2 AND ?2 <= end", [model.parentDot.parentCreator, model.parentDot.parentCreatedTime])
-        .first != nil {
+        .fetch(
+          EmptyRange.self,
+          allWhere: "node = ?1 AND start <= ?2 AND ?2 <= end",
+          [model.parentDot.parentCreator, model.parentDot.parentCreatedTime]
+        )
+        .first != nil
+      {
         return true
       }
     }
     // Check if the model itself was deleted.
     return try proxy
-      .fetch(EmptyRange.self, allWhere: "node = ?1 AND start <= ?2 AND ?2 <= end", [model.dot.creator, model.dot.createdTime])
+      .fetch(
+        EmptyRange.self,
+        allWhere: "node = ?1 AND start <= ?2 AND ?2 <= end",
+        [model.dot.creator, model.dot.createdTime]
+      )
       .first != nil
   }
 
