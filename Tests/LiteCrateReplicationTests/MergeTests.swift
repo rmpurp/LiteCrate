@@ -9,7 +9,6 @@
 @testable import LiteCrateReplication
 import XCTest
 
-// TODO: Test node id tie-breaking
 final class MergeTests: XCTestCase {
   func testDatabaseIDTiebreaker() throws {
     try testActions {

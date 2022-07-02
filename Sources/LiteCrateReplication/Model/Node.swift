@@ -13,6 +13,8 @@ struct Node: DatabaseCodable, Identifiable {
   var minTime: Int64
   var time: Int64
 
+  static var exampleInstance: Node = .init(id: UUID(), minTime: 0, time: 0)
+
   mutating func mergeForDecoding(_ other: Node) {
     assert(other.id == id)
     minTime = max(minTime, other.minTime)

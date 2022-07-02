@@ -10,38 +10,16 @@ import LiteCrateCore
 
 public protocol DatabaseCodable<Key>: Codable {
   associatedtype Key: SqliteRepresentable
-  static var tableName: String { get }
   var tableName: String { get }
   static var foreignKeys: [ForeignKey] { get }
   static var primaryKeyColumn: String { get }
   var primaryKeyValue: Key { get }
+  static var exampleInstance: Self { get }
 }
 
 public extension DatabaseCodable {
-  static var tableName: String { String(describing: Self.self) }
+  var tableName: String { String(describing: Self.self) }
   static var foreignKeys: [ForeignKey] { [] }
-
-  var tableName: String { Self.tableName }
-
-  var creationStatement: String {
-    let encoder = SchemaEncoder()
-    try! encode(to: encoder)
-
-    let opening = "CREATE TABLE \(Self.tableName) (\n"
-    var components = [String]()
-    let ending = "\n);"
-
-    let sortedColumns = encoder.columns.sorted {
-      if $0.key == Self.primaryKeyColumn { return true }
-      if $1.key == Self.primaryKeyColumn { return false }
-      return $0.key < $1.key
-    }
-
-    components.append(contentsOf: sortedColumns.map { "\($0) \($1.rawValue)" })
-    components.append("PRIMARY KEY (\(Self.primaryKeyColumn))")
-    components.append(contentsOf: Self.foreignKeys.map(\.creationStatement))
-    return opening + components.map { "    " + $0 }.joined(separator: ",\n") + ending
-  }
 }
 
 public extension DatabaseCodable where Self: Identifiable, ID == Key {
@@ -85,7 +63,7 @@ public struct ForeignKey {
     self.onDelete = onDelete
   }
 
-  fileprivate var creationStatement: String {
+  internal var creationStatement: String {
     "FOREIGN KEY (\(columnName)) REFERENCES \(targetTable)(\(targetColumn)) ON DELETE \(onDelete.clause)"
   }
 }

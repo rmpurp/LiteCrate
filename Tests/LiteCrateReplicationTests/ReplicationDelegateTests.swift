@@ -15,25 +15,37 @@ private struct Employee: ReplicatingModel, Identifiable {
   var id: UUID
   var name: String
   var dot: Dot = .init()
+
+  static var exampleInstance: Employee {
+    Employee(id: UUID(), name: "")
+  }
 }
 
 private struct Boss: DatabaseCodable, Identifiable {
   var id: UUID
   var rank: Int64
+
+  static var exampleInstance: Boss {
+    Boss(id: UUID(), rank: 0)
+  }
 }
 
 private struct Customer: ReplicatingModel, Identifiable {
   var id: UUID
   var orderArrived: Int64
   var dot: Dot = .init()
+
+  static var exampleInstance: Customer {
+    Customer(id: UUID(), orderArrived: 0)
+  }
 }
 
 final class ReplicationDelegateTests: XCTestCase {
   func testTime() throws {
     let crate = try ReplicationController(location: ":memory:", nodeID: UUID()) {
       MigrationGroup {
-        CreateReplicatingTable(Employee(id: UUID(), name: ""))
-        CreateTable(Boss(id: UUID(), rank: 0))
+        CreateReplicatingTable(Employee.self)
+        CreateTable(Boss.self)
       }
     }
 

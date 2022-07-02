@@ -13,6 +13,10 @@ private struct Parent: ReplicatingModel {
   var dot: Dot = .init()
   var value: Int64
   var isParent: Bool = true
+
+  static var exampleInstance: Parent {
+    Parent(value: 0)
+  }
 }
 
 private struct Child: ChildReplicatingModel {
@@ -20,6 +24,9 @@ private struct Child: ChildReplicatingModel {
   var parent: Parent.Key
   var parentDot: ForeignKeyDot
   var value: String
+  static var exampleInstance: Child {
+    Child(parent: Parent(value: 0), value: "")
+  }
 
   init(dot: Dot = Dot(), parent: Parent, value: String) {
     self.dot = dot
@@ -38,8 +45,8 @@ private struct Child: ChildReplicatingModel {
 final class ForeignKeyTests: XCTestCase {
   func testForeignKey() throws {
     let controller = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-      CreateReplicatingTable(Parent(value: 0))
-      CreateReplicatingTable(Child(parent: Parent(value: 0), value: ""))
+      CreateReplicatingTable(Parent.self)
+      CreateReplicatingTable(Child.self)
     }
 
     var parent = Parent(value: 0)

@@ -12,17 +12,11 @@ extension DispatchSemaphore {
 
 @available(macOS 12.0, *)
 final class LiteCrateTests: XCTestCase {
-  func testTableCreation() {
-    let person = Person(name: "arst", dogID: UUID())
-    print(person.creationStatement)
-    XCTAssertTrue(true)
-  }
-
   func testSaveAndFetch() throws {
     let person = Person(name: "Bob", dogID: UUID())
     let crate = try LiteCrate(":memory:") {
       MigrationGroup {
-        CreateTable(Person(name: "", dogID: UUID()))
+        CreateTable(Person.self)
       }
     }
     try crate.inTransaction { proxy in

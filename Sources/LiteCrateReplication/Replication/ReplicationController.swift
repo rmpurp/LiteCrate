@@ -12,13 +12,13 @@ import LiteCrateCore
 class ReplicationController: LiteCrateDelegate {
   private var liteCrate: LiteCrate!
 
-  var exampleInstances = [any ReplicatingModel]()
+  var tables = [any ReplicatingModel.Type]()
   var nodeID: UUID
   var time: Int64!
   var transactionTime: Int64!
 
   var userInfo: [CodingUserInfoKey: Any] {
-    [.init(rawValue: "instances")!: exampleInstances]
+    [.init(rawValue: "tables")!: tables as [any ReplicatingModel.Type]]
   }
 
   init(location: String, nodeID: UUID, @MigrationBuilder migrations: () -> Migration) throws {
@@ -34,13 +34,13 @@ class ReplicationController: LiteCrateDelegate {
   func migration(didInitializeIn proxy: LiteCrate.TransactionProxy) throws {
     try proxy.execute("CREATE TABLE Node (id TEXT PRIMARY KEY, time INT NOT NULL, minTime INT NOT NULL)")
     try proxy
-      .execute(EmptyRange(node: UUID(), start: 0, end: 0, lastModifier: UUID(), sequenceNumber: 0).creationStatement)
+      .execute(SchemaEncoder(EmptyRange.exampleInstance).creationStatement)
     try proxy.execute("INSERT INTO Node VALUES (?, 0, 0)", [nodeID])
   }
 
   func migration<A>(willRun action: A) where A: MigrationAction {
     if let action = action as? ReplicatingTableMigrationAction {
-      action.modifyReplicatingTables(&exampleInstances)
+      action.modifyReplicatingTables(&tables)
     }
   }
 
@@ -116,17 +116,17 @@ extension ReplicationController {
     }
 
     if deleteModels {
-      for instance in exampleInstances {
-        try deleteAll(proxy, withSameTypeAs: instance, in: range)
+      for table in tables {
+        try deleteAll(proxy, type: table, in: range)
       }
     }
     try proxy.save(range)
   }
 
-  private func deleteAll<T: ReplicatingModel>(_ proxy: LiteCrate.TransactionProxy, withSameTypeAs instance: T,
+  private func deleteAll<T: ReplicatingModel>(_ proxy: LiteCrate.TransactionProxy, type: T.Type,
                                               in range: EmptyRange) throws
   {
-    if instance is (any ChildReplicatingModel) {
+    if type.self is any ChildReplicatingModel.Type {
       let childModels = try proxy.fetch(
         T.self,
         allWhere: "parentCreator = ? AND ? <= parentCreatedTime AND parentCreatedTime <= ?",

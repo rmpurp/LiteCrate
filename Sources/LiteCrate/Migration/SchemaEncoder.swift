@@ -8,7 +8,7 @@
 import Foundation
 import LiteCrateCore
 
-class SchemaEncoder: Encoder {
+public class SchemaEncoder: Encoder {
   enum SqliteType: String {
     case integer = "INTEGER NOT NULL"
     case real = "REAL NOT NULL"
@@ -20,8 +20,19 @@ class SchemaEncoder: Encoder {
     case nullableBlob = "BLOB"
   }
 
-  var codingPath: [CodingKey] = []
-  var userInfo: [CodingUserInfoKey: Any] = [:]
+  public init<T: DatabaseCodable>(_ instance: T) {
+    tableName = instance.tableName
+    primaryKeyColumn = T.primaryKeyColumn
+    foreignKeys = T.foreignKeys
+    try? instance.encode(to: self)
+  }
+
+  public var codingPath: [CodingKey] = []
+  public var userInfo: [CodingUserInfoKey: Any] = [:]
+
+  var tableName: String
+  var primaryKeyColumn: String
+  var foreignKeys: [ForeignKey]
 
   var columns: [String: SqliteType] = [:]
 
@@ -192,15 +203,43 @@ class SchemaEncoder: Encoder {
     }
   }
 
-  func container<Key>(keyedBy _: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
+  public func container<Key>(keyedBy _: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
     KeyedEncodingContainer(KEC(encoder: self))
   }
 
-  func unkeyedContainer() -> UnkeyedEncodingContainer {
+  public func unkeyedContainer() -> UnkeyedEncodingContainer {
     fatalError("unkeyed container not allowed")
   }
 
-  func singleValueContainer() -> SingleValueEncodingContainer {
+  public func singleValueContainer() -> SingleValueEncodingContainer {
     fatalError()
+  }
+}
+
+public extension SchemaEncoder {
+  var creationStatement: String {
+    let opening = "CREATE TABLE \(tableName) (\n"
+    var components = [String]()
+    let ending = "\n);"
+
+    let sortedColumns = columns.sorted {
+      if $0.key == primaryKeyColumn { return true }
+      if $1.key == primaryKeyColumn { return false }
+      return $0.key < $1.key
+    }
+
+    components.append(contentsOf: sortedColumns.map { "\($0) \($1.rawValue)" })
+    components.append("PRIMARY KEY (\(primaryKeyColumn))")
+    components.append(contentsOf: foreignKeys.map(\.creationStatement))
+    return opening + components.map { "    " + $0 }.joined(separator: ",\n") + ending
+  }
+
+  var selectStatement: String {
+    let columns = [String](columns.keys)
+    let columnString = columns.lazy
+      .map { "\($0) AS \($0)" }
+      .joined(separator: ",")
+
+    return "SELECT \(columnString) FROM \(tableName)"
   }
 }

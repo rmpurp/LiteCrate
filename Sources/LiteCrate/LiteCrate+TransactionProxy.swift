@@ -10,10 +10,6 @@ import LiteCrateCore
 
 public extension LiteCrate {
   final class TransactionProxy {
-    public func createTable<T: DatabaseCodable>(_ modelInstance: T) throws {
-      try execute(modelInstance.creationStatement)
-    }
-
     public func fetch<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type, with primaryKey: U) throws -> T? {
       try fetch(type, allWhere: "\(T.primaryKeyColumn) = ?", [primaryKey]).first
     }
@@ -28,7 +24,8 @@ public extension LiteCrate {
                                           _ values: [SqliteRepresentable?] = []) throws -> [T]
     {
       let sqlWhereClause = sqlWhereClause ?? "TRUE"
-      let cursor = try db.query("SELECT * FROM \(T.tableName) WHERE \(sqlWhereClause)", values)
+
+      let cursor = try db.query("\(selectStatement(T.self)) WHERE \(sqlWhereClause)", values)
       let decoder = DatabaseDecoder(cursor: cursor)
       var models = [T]()
       while cursor.step() {
@@ -48,32 +45,11 @@ public extension LiteCrate {
                                                           _ values: [SqliteRepresentable?] = []) throws -> [T]
     {
       let sqlWhereClause = sqlWhereClause ?? "TRUE"
-      let cursor = try db.query("SELECT * FROM \(T.tableName) WHERE \(sqlWhereClause)", values)
+      let cursor = try db.query("\(selectStatement(T.self)) WHERE \(sqlWhereClause)", values)
       let decoder = DatabaseDecoder(cursor: cursor)
       var models = [T]()
       while cursor.step() {
         models.append(try T(from: decoder))
-      }
-      return models
-    }
-
-    // TODO: Delete.
-    public func fetch<T: DatabaseCodable>(
-      _: T.Type,
-      joining joinTable: String,
-      on joinClause: String,
-      allWhere sqlWhereClause: String? = nil,
-      _ values: [SqliteRepresentable?] = []
-    ) throws -> [T] {
-      let sqlWhereClause = sqlWhereClause ?? "TRUE"
-      let cursor = try db.query(
-        "SELECT \(T.tableName).* FROM \(T.tableName) INNER JOIN \(joinTable) ON \(joinClause) WHERE \(sqlWhereClause)",
-        values
-      )
-      let decoder = DatabaseDecoder(cursor: cursor)
-      var models = [T]()
-      while cursor.step() {
-        try models.append(T(from: decoder))
       }
       return models
     }
@@ -99,7 +75,7 @@ public extension LiteCrate {
 
     /// Save the given model, bypassing any processing by the delegate.
     public func saveIgnoringDelegate<T: DatabaseCodable>(_ model: T) throws {
-      let encoder = DatabaseEncoder(tableName: T.tableName)
+      let encoder = DatabaseEncoder(tableName: T.exampleInstance.tableName)
       try model.encode(to: encoder)
       let (insertStatement, values) = encoder.insertStatement
       try db.execute(insertStatement, values)
@@ -114,7 +90,10 @@ public extension LiteCrate {
     }
 
     public func deleteIgnoringDelegate<T: DatabaseCodable>(_ model: T) throws {
-      try db.execute("DELETE FROM \(T.tableName) WHERE \(T.primaryKeyColumn) = ?", [model.primaryKeyValue])
+      try db.execute(
+        "DELETE FROM \(T.exampleInstance.tableName) WHERE \(T.primaryKeyColumn) = ?",
+        [model.primaryKeyValue]
+      )
     }
 
     public func delete<T: DatabaseCodable, U: SqliteRepresentable>(_: T.Type, with primaryKey: U) throws {
@@ -126,7 +105,7 @@ public extension LiteCrate {
                                                            _ values: [SqliteRepresentable?] = []) throws
     {
       let sqlWhereClause = sqlWhereClause.flatMap { "WHERE \($0)" } ?? ""
-      try db.execute("DELETE FROM \(T.tableName) \(sqlWhereClause)", values)
+      try db.execute("DELETE FROM \(T.exampleInstance.tableName) \(sqlWhereClause)", values)
     }
 
     public func delete<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
@@ -165,5 +144,14 @@ internal extension LiteCrate.TransactionProxy {
   func setCurrentSchemaVersion(version: Int64) throws {
     try execute(String(format: "PRAGMA user_version = %lld", version), [])
     // Being very careful to avoid injection vulnerability; ? is not valid here.
+  }
+}
+
+internal extension LiteCrate.TransactionProxy {
+  /// For the given table, get a String of the format `SELECT col1 AS col1,col2 AS col2,... FROM tableName`
+  private func selectStatement<T: DatabaseCodable>(_: T.Type) throws -> String {
+    let encoder = SchemaEncoder(T.exampleInstance)
+    try T.exampleInstance.encode(to: encoder)
+    return encoder.selectStatement
   }
 }

@@ -12,13 +12,16 @@ import XCTest
 private struct Model: ReplicatingModel {
   var dot: Dot = .init()
   var val: Int64 = 0
+
+  static var exampleInstance: Model {
+    Model()
+  }
 }
 
-// TODO: Test node id tie-breaking
 final class EmptyRangeMergeTests: XCTestCase {
   func testMergeRanges() throws {
     let controller = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-      CreateReplicatingTable(Model(dot: Dot()))
+      CreateReplicatingTable(Model.self)
     }
 
     try controller.inTransaction { proxy in

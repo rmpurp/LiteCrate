@@ -9,22 +9,24 @@ import Foundation
 import LiteCrate
 
 public protocol ReplicatingTableMigrationAction: MigrationAction {
-  func modifyReplicatingTables(_ replicatingTables: inout [any ReplicatingModel])
+  func modifyReplicatingTables(
+    _ tables: inout [any ReplicatingModel.Type]
+  )
 }
 
 public struct CreateReplicatingTable<T: ReplicatingModel>: ReplicatingTableMigrationAction {
   let creationStatement: String
-  let instance: any ReplicatingModel
-  init(_ instance: T) {
-    creationStatement = instance.creationStatement
-    self.instance = instance
+  init(_: T.Type) {
+    creationStatement = SchemaEncoder(T.exampleInstance).creationStatement
   }
 
   public func perform(in proxy: LiteCrate.TransactionProxy) throws {
     try proxy.execute(creationStatement)
   }
 
-  public func modifyReplicatingTables(_ replicatingTables: inout [any ReplicatingModel]) {
-    replicatingTables.append(instance)
+  public func modifyReplicatingTables(
+    _ tables: inout [any ReplicatingModel.Type]
+  ) {
+    tables.append(T.self)
   }
 }

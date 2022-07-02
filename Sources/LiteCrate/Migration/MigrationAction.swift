@@ -21,8 +21,8 @@ public extension MigrationAction {
 
 public struct CreateTable<T: DatabaseCodable>: MigrationAction {
   let creationStatement: String
-  init(_ instance: T) {
-    creationStatement = instance.creationStatement
+  init(_: T.Type) {
+    creationStatement = SchemaEncoder(T.exampleInstance).creationStatement
   }
 
   public func perform(in proxy: LiteCrate.TransactionProxy) throws {

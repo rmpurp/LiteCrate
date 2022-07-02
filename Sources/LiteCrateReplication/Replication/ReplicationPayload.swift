@@ -34,19 +34,19 @@ class ReplicationPayload: Codable {
   }
 
   required init(from decoder: Decoder) throws {
-    guard let exampleInstances = decoder.userInfo[CodingUserInfoKey(rawValue: "instances")!] as? [any ReplicatingModel]
+    guard let tables = decoder.userInfo[CodingUserInfoKey(rawValue: "tables")!] as? [any ReplicatingModel.Type]
     else {
       preconditionFailure()
     }
 
     let container = try decoder.container(keyedBy: TableNameCodingKey.self)
 
-    for instance in exampleInstances {
-      models[instance.tableName] = try decode(instance: instance, container: container)
+    for table in tables {
+      models[table.exampleInstance.tableName] = try decode(table, container: container)
     }
 
-    nodes = try container.decode([Node].self, forKey: .init(stringValue: Node.tableName))
-    ranges = try container.decode([EmptyRange].self, forKey: .init(stringValue: EmptyRange.tableName))
+    nodes = try container.decode([Node].self, forKey: .init(stringValue: Node.exampleInstance.tableName))
+    ranges = try container.decode([EmptyRange].self, forKey: .init(stringValue: EmptyRange.exampleInstance.tableName))
   }
 
   func encode(to encoder: Encoder) throws {
@@ -57,13 +57,13 @@ class ReplicationPayload: Codable {
         try arrayContainer.encode(instance)
       }
     }
-    try container.encode(nodes, forKey: .init(stringValue: Node.tableName))
-    try container.encode(ranges, forKey: .init(stringValue: EmptyRange.tableName))
+    try container.encode(nodes, forKey: .init(stringValue: Node.exampleInstance.tableName))
+    try container.encode(ranges, forKey: .init(stringValue: EmptyRange.exampleInstance.tableName))
   }
 }
 
-private func decode<T: ReplicatingModel>(instance: T,
+private func decode<T: ReplicatingModel>(_ type: T.Type,
                                          container: KeyedDecodingContainer<TableNameCodingKey>) throws -> [T]
 {
-  try container.decode([T].self, forKey: .init(stringValue: instance.tableName))
+  try container.decode([T].self, forKey: .init(stringValue: type.exampleInstance.tableName))
 }

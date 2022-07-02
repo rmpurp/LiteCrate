@@ -12,6 +12,10 @@ import XCTest
 @testable import LiteCrateReplication
 
 private struct Employee: ReplicatingModel {
+  static var exampleInstance: Employee {
+    Employee(name: "")
+  }
+
   var name: String
   var dot: Dot = .init()
 }
@@ -19,17 +23,21 @@ private struct Employee: ReplicatingModel {
 private struct Boss: ReplicatingModel {
   var rank: Int64
   var dot: Dot = .init()
+
+  static var exampleInstance: Boss {
+    Boss(rank: 0)
+  }
 }
 
 final class MigrationTests: XCTestCase {
   func testMigration() throws {
     let controller = try ReplicationController(location: ":memory:", nodeID: UUID()) {
       MigrationGroup {
-        CreateReplicatingTable(Employee(name: ""))
-        CreateReplicatingTable(Boss(rank: 0))
+        CreateReplicatingTable(Employee.self)
+        CreateReplicatingTable(Boss.self)
       }
     }
 
-    XCTAssertEqual(controller.exampleInstances.count, 2)
+    XCTAssertEqual(controller.tables.count, 2)
   }
 }

@@ -18,6 +18,10 @@ struct TestModel: ReplicatingModel {
   var value: Int64
   var dot: Dot = .init()
   var isParent: Bool = true
+
+  static var exampleInstance: TestModel {
+    TestModel(value: 0)
+  }
 }
 
 struct ChildModel: ChildReplicatingModel {
@@ -34,6 +38,10 @@ struct ChildModel: ChildReplicatingModel {
 
   static var foreignKeys: [ForeignKey] {
     [.init("parent", references: "TestModel", targetColumn: "id")]
+  }
+
+  static var exampleInstance: ChildModel {
+    ChildModel(value: 0, parent: TestModel(value: 0))
   }
 }
 
@@ -54,8 +62,8 @@ struct CreateDatabase: TestAction {
     let id = uuid(for: databaseID)
     print("Creating database with id \(databaseID) -> \(id)")
     harness.databases[databaseID] = try ReplicationController(location: ":memory:", nodeID: id) {
-      CreateReplicatingTable(TestModel(value: 0))
-      CreateReplicatingTable(ChildModel(value: 0, parent: TestModel(value: 0)))
+      CreateReplicatingTable(TestModel.self)
+      CreateReplicatingTable(ChildModel.self)
     }
   }
 }
@@ -203,7 +211,7 @@ struct Merge: TestAction {
     print("Payload: \(payload)")
 
     if let payloadValues {
-      let actual = payload.models[TestModel.tableName]!.map { ($0 as! TestModel).value }
+      let actual = payload.models[TestModel.exampleInstance.tableName]!.map { ($0 as! TestModel).value }
       XCTAssertEqual(payloadValues.sorted(), actual.sorted(), file: file, line: line)
     }
 

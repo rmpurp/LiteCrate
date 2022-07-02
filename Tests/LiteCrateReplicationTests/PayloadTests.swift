@@ -11,11 +11,19 @@ import XCTest
 private struct ModelA: ReplicatingModel, Equatable {
   var dot: Dot = .init()
   var value: Int64
+
+  static var exampleInstance: ModelA {
+    ModelA(value: 0)
+  }
 }
 
 private struct ModelB: ReplicatingModel, Equatable {
   var dot: Dot = .init()
   var value: String
+
+  static var exampleInstance: ModelB {
+    ModelB(value: "")
+  }
 }
 
 extension Node: Equatable {
@@ -40,7 +48,7 @@ final class PayloadTests: XCTestCase {
 
     let jsonEncoder = JSONEncoder()
     let jsonDecoder = JSONDecoder()
-    jsonDecoder.userInfo = [.init(rawValue: "instances")!: [ModelA(value: 0), ModelB(value: "")]]
+    jsonDecoder.userInfo = [.init(rawValue: "tables")!: [ModelA.self, ModelB.self]]
 
     let encoded = try jsonEncoder.encode(payload)
     let decoded = try jsonDecoder.decode(ReplicationPayload.self, from: encoded)

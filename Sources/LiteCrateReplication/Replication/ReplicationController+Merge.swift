@@ -17,8 +17,8 @@ extension ReplicationController {
       localNodes.append(contentsOf: try proxy.fetch(Node.self))
       let nodesForFetching = Node.mergeForEncoding(localNodes: localNodes, remoteNodes: remoteNodes)
 
-      for exampleInstance in exampleInstances {
-        models[exampleInstance.tableName] = try fetch(instance: exampleInstance, proxy: proxy, nodes: nodesForFetching)
+      for table in tables {
+        models[table.exampleInstance.tableName] = try fetch(proxy: proxy, type: table, nodes: nodesForFetching)
       }
 
       ranges.append(contentsOf: try fetchEmptyRanges(proxy: proxy, nodes: nodesForFetching))
@@ -28,8 +28,8 @@ extension ReplicationController {
 
   public func merge(_ payload: ReplicationPayload) throws {
     try inTransaction { [unowned self] localProxy in
-      for instance in exampleInstances {
-        try merge(model: instance, nodeID: nodeID, time: time, localProxy: localProxy, payload: payload)
+      for table in tables {
+        try merge(model: table.exampleInstance, nodeID: nodeID, time: time, localProxy: localProxy, payload: payload)
       }
 
       let localNodes = try localProxy.fetch(Node.self)
@@ -73,7 +73,7 @@ extension ReplicationController {
                                           localProxy: LiteCrate.TransactionProxy,
                                           payload: ReplicationPayload) throws
   {
-    let remoteModels = payload.models[T.tableName]! // TODO: Throw error.
+    let remoteModels = payload.models[T.exampleInstance.tableName]! // TODO: Throw error.
 
     for remoteModel in remoteModels {
       guard try !isDeleted(proxy: localProxy, model: remoteModel) else {
@@ -97,7 +97,7 @@ extension ReplicationController {
   }
 }
 
-private func fetch<T: ReplicatingModel>(instance _: T, proxy: LiteCrate.TransactionProxy,
+private func fetch<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, type _: T.Type,
                                         nodes: [Node]) throws -> [any ReplicatingModel]
 {
   var models: [T] = []
@@ -131,7 +131,7 @@ private func populate<T: ReplicatingModel>(
   proxy: LiteCrate.TransactionProxy,
   container: KeyedDecodingContainer<TableNameCodingKey>
 ) throws {
-  let instances = try container.decode([T].self, forKey: TableNameCodingKey(stringValue: T.tableName))
+  let instances = try container.decode([T].self, forKey: TableNameCodingKey(stringValue: T.exampleInstance.tableName))
   for instance in instances {
     try proxy.saveIgnoringDelegate(instance)
   }
