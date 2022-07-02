@@ -23,6 +23,7 @@ public class LiteCrate {
   ) throws {
     db = try Database(location)
     self.delegate = delegate
+    try db.execute("PRAGMA FOREIGN_KEYS = TRUE")
     try runMigrations(migration: migrations())
   }
 

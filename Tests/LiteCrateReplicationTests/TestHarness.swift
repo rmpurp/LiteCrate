@@ -24,20 +24,18 @@ struct TestModel: ReplicatingModel {
   }
 }
 
-struct ChildModel: ChildReplicatingModel {
-  var parentDot: LiteCrateReplication.ForeignKeyDot
+struct ChildModel: ReplicatingModel {
   var parent: TestModel.Key
   var value: Int64
   var dot: Dot = .init()
 
   init(value: Int64, parent: TestModel) {
     self.value = value
-    parentDot = ForeignKeyDot(parent: parent)
     self.parent = parent.id
   }
 
-  static var foreignKeys: [ForeignKey] {
-    [.init("parent", references: "TestModel", targetColumn: "id")]
+  var foreignKeyConstraints: FKConstraints<Self> {
+    ForeignKey(TestModel.self, columnName: "parent", action: .noAction, path: \Self.parent)
   }
 
   static var exampleInstance: ChildModel {
@@ -211,7 +209,7 @@ struct Merge: TestAction {
     print("Payload: \(payload)")
 
     if let payloadValues {
-      let actual = payload.models[TestModel.exampleInstance.tableName]!.map { ($0 as! TestModel).value }
+      let actual = payload.models[TestModel.exampleInstance.tableName]!.map { ($0.model as! TestModel).value }
       XCTAssertEqual(payloadValues.sorted(), actual.sorted(), file: file, line: line)
     }
 

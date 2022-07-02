@@ -9,7 +9,7 @@ import Foundation
 import LiteCrateCore
 
 public class SchemaEncoder: Encoder {
-  enum SqliteType: String {
+  public enum SqliteType: String {
     case integer = "INTEGER NOT NULL"
     case real = "REAL NOT NULL"
     case text = "TEXT NOT NULL"
@@ -23,7 +23,7 @@ public class SchemaEncoder: Encoder {
   public init<T: DatabaseCodable>(_ instance: T) {
     tableName = instance.tableName
     primaryKeyColumn = T.primaryKeyColumn
-    foreignKeys = T.foreignKeys
+    constraintGetter = { [unowned self] in getForeignKeyClauses(from: instance) }
     try? instance.encode(to: self)
   }
 
@@ -32,9 +32,9 @@ public class SchemaEncoder: Encoder {
 
   var tableName: String
   var primaryKeyColumn: String
-  var foreignKeys: [ForeignKey]
 
-  var columns: [String: SqliteType] = [:]
+  var constraintGetter: () -> [String] = { [] }
+  public var columns: [String: SqliteType] = [:]
 
   struct KEC<Key: CodingKey>: KeyedEncodingContainerProtocol {
     var codingPath: [CodingKey] = []
@@ -216,7 +216,29 @@ public class SchemaEncoder: Encoder {
   }
 }
 
+class ForeignKeySchemaVisitor<T: DatabaseCodable>: ForeignKeyVisitor {
+  var components: [String] = []
+
+  init(constraints: FKConstraints<T>) {
+    constraints.visit(by: self)
+  }
+
+  func visit<Source, Destination>(_ element: ForeignKey<Source, Destination>) where Source: DatabaseCodable,
+    Destination: DatabaseCodable
+  {
+    let clause =
+      "FOREIGN KEY (\(element.columnName)) REFERENCES \(Destination.exampleInstance.tableName)(\(Destination.primaryKeyColumn)) ON DELETE \(element.action.clause)"
+
+    components.append(clause)
+  }
+}
+
 public extension SchemaEncoder {
+  func getForeignKeyClauses<T: DatabaseCodable>(from instance: T) -> [String] {
+    let fkVisitor = ForeignKeySchemaVisitor<T>(constraints: instance.foreignKeyConstraints)
+    return fkVisitor.components
+  }
+
   var creationStatement: String {
     let opening = "CREATE TABLE \(tableName) (\n"
     var components = [String]()
@@ -230,7 +252,7 @@ public extension SchemaEncoder {
 
     components.append(contentsOf: sortedColumns.map { "\($0) \($1.rawValue)" })
     components.append("PRIMARY KEY (\(primaryKeyColumn))")
-    components.append(contentsOf: foreignKeys.map(\.creationStatement))
+    components.append(contentsOf: constraintGetter())
     return opening + components.map { "    " + $0 }.joined(separator: ",\n") + ending
   }
 

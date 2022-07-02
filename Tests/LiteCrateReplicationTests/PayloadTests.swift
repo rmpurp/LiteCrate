@@ -32,11 +32,18 @@ extension Node: Equatable {
   }
 }
 
+extension ReplicatingModel {
+  var pair: any ModelDotPairProtocol {
+    // TODO: Fix
+    ModelDotPair(model: self, dot: dot, foreignKeyDots: [])
+  }
+}
+
 final class PayloadTests: XCTestCase {
   func testPayloadCodingRoundtrip() throws {
     let payload = ReplicationPayload(models: [
-      "ModelA": [ModelA(value: 5), ModelA(value: 8)],
-      "ModelB": [ModelB(value: "a"), ModelB(value: "b"), ModelB(value: "c")],
+      "ModelA": [ModelA(value: 5).pair, ModelA(value: 8).pair],
+      "ModelB": [ModelB(value: "a").pair, ModelB(value: "b").pair, ModelB(value: "c").pair],
     ], nodes: [
       Node(id: UUID(), minTime: 1, time: 2),
       Node(id: UUID(), minTime: 3, time: 4),
@@ -48,14 +55,14 @@ final class PayloadTests: XCTestCase {
 
     let jsonEncoder = JSONEncoder()
     let jsonDecoder = JSONDecoder()
-    jsonDecoder.userInfo = [.init(rawValue: "tables")!: [ModelA.self, ModelB.self]]
+    jsonDecoder.userInfo = [.init(rawValue: "tables")!: ["ModelA": ModelA.self, "ModelB": ModelB.self]]
 
     let encoded = try jsonEncoder.encode(payload)
     let decoded = try jsonDecoder.decode(ReplicationPayload.self, from: encoded)
-    let actualModels = decoded.models["ModelA"] as! [ModelA]
-    let actualModelsB = decoded.models["ModelB"] as! [ModelB]
-    XCTAssertEqual(actualModels, payload.models["ModelA"] as! [ModelA])
-    XCTAssertEqual(actualModelsB, payload.models["ModelB"] as! [ModelB])
+    let actualModels = decoded.models["ModelA"]!.map { $0.model as! ModelA }
+    let actualModelsB = decoded.models["ModelB"]!.map { $0.model as! ModelB }
+    XCTAssertEqual(actualModels, payload.models["ModelA"]!.map { $0.model as! ModelA })
+    XCTAssertEqual(actualModelsB, payload.models["ModelB"]!.map { $0.model as! ModelB })
     XCTAssertEqual(decoded.nodes, payload.nodes)
   }
 }

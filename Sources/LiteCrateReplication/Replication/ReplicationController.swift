@@ -12,13 +12,13 @@ import LiteCrateCore
 class ReplicationController: LiteCrateDelegate {
   private var liteCrate: LiteCrate!
 
-  var tables = [any ReplicatingModel.Type]()
+  var tables = [String: any ReplicatingModel.Type]()
   var nodeID: UUID
   var time: Int64!
   var transactionTime: Int64!
 
   var userInfo: [CodingUserInfoKey: Any] {
-    [.init(rawValue: "tables")!: tables as [any ReplicatingModel.Type]]
+    [.init(rawValue: "tables")!: tables]
   }
 
   init(location: String, nodeID: UUID, @MigrationBuilder migrations: () -> Migration) throws {
@@ -45,6 +45,7 @@ class ReplicationController: LiteCrateDelegate {
   }
 
   func transaction(didBeginIn proxy: LiteCrate.TransactionProxy) throws {
+    try proxy.execute("PRAGMA defer_foreign_keys = TRUE")
     let cursor = try proxy.query("SELECT time FROM Node WHERE id = ?", [nodeID])
     guard cursor.step() else { fatalError("Corrupt database.") }
     time = cursor.int(for: 0)
@@ -55,16 +56,52 @@ class ReplicationController: LiteCrateDelegate {
     try proxy.execute("UPDATE Node SET time = ? WHERE id = ?", [time, nodeID])
   }
 
-  func proxy<T>(_: LiteCrate.TransactionProxy, willSave model: T) throws -> T where T: DatabaseCodable {
-    if var model = model as? any ReplicatingModel {
-      model.dot.update(modifiedBy: nodeID, at: time, transactionTime: transactionTime)
-      time += 1
-      return model as! T
+  class ForeignKeyDotCollector<T: ReplicatingModel>: ForeignKeyVisitor {
+    private let proxy: LiteCrate.TransactionProxy
+    var dots = [ForeignKeyDot]()
+    var model: T
+
+    init(_ proxy: LiteCrate.TransactionProxy, model: T) {
+      self.proxy = proxy
+      self.model = model
+      self.model.foreignKeyConstraints.visit(by: self)
+    }
+
+    func visit<Destination: DatabaseCodable>(_ element: ForeignKey<T, Destination>) {
+      // TODO: Error handling
+      let cursor = try! proxy.query(
+        "SELECT creator, createdTime FROM \(Destination.exampleInstance.tableName) WHERE \(Destination.primaryKeyColumn) = ?",
+        [element.path(model)]
+      )
+      guard cursor.step() else { fatalError() }
+
+      let creator = cursor.uuid(for: 0)
+      let createdTime = cursor.int(for: 1)
+
+      dots.append(.init(parentCreator: creator, parentCreatedTime: createdTime, prefix: element.columnName))
+    }
+  }
+
+  private func handleReplicatingModel<T: ReplicatingModel>(_ proxy: LiteCrate.TransactionProxy,
+                                                           model: T) throws -> any DatabaseCodable
+  {
+    var dot = model.dot
+    dot.update(modifiedBy: nodeID, at: time, transactionTime: transactionTime)
+    time += 1
+    let collector = ForeignKeyDotCollector(proxy, model: model)
+    return model.toErasedModelDot(dot: dot, fkDots: collector.dots)
+  }
+
+  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws -> any DatabaseCodable {
+    if let model = model as? any ReplicatingModel {
+      return try handleReplicatingModel(proxy, model: model)
     }
     return model
   }
 
-  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willDelete model: T) throws -> T? {
+  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy,
+                                 willDelete model: T) throws -> (any DatabaseCodable)?
+  {
     if let model = model as? (any ReplicatingModel) {
       let emptyRange = EmptyRange(
         node: model.dot.creator,
@@ -73,9 +110,11 @@ class ReplicationController: LiteCrateDelegate {
         lastModifier: nodeID,
         sequenceNumber: transactionTime
       )
+
+      // This will delete the model, so the transactionProxy won't need to do any work after this.
       try addAndMerge(proxy, range: emptyRange, deleteModels: model.isParent)
 
-      // Make deletion increment time, which necessitates adding an EmptyRange at the old time.
+      // Deletions increment time, which necessitates adding an EmptyRange at the old time.
       let placeholderRange = EmptyRange(
         node: nodeID,
         start: time,
@@ -116,20 +155,20 @@ extension ReplicationController {
     }
 
     if deleteModels {
-      for table in tables {
+      for table in tables.values {
         try deleteAll(proxy, type: table, in: range)
       }
     }
     try proxy.save(range)
   }
 
-  private func deleteAll<T: ReplicatingModel>(_ proxy: LiteCrate.TransactionProxy, type: T.Type,
+  private func deleteAll<T: ReplicatingModel>(_ proxy: LiteCrate.TransactionProxy, type _: T.Type,
                                               in range: EmptyRange) throws
   {
-    if type.self is any ChildReplicatingModel.Type {
+    for fkDot in ModelDotPair<T>.exampleInstance.foreignKeyDots {
       let childModels = try proxy.fetch(
         T.self,
-        allWhere: "parentCreator = ? AND ? <= parentCreatedTime AND parentCreatedTime <= ?",
+        allWhere: "\(fkDot.prefix)Creator = ? AND ? <= \(fkDot.prefix)CreatedTime AND \(fkDot.prefix)CreatedTime <= ?",
         [range.node, range.start, range.end]
       )
 
@@ -145,6 +184,7 @@ extension ReplicationController {
     )
 
     for model in models {
+      // TODO: Recursive foreign keys?
       try proxy.deleteIgnoringDelegate(model)
     }
   }

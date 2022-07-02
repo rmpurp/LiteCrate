@@ -9,15 +9,17 @@ import Foundation
 import LiteCrate
 
 extension ReplicationController {
+  /// Obtain the payload, only obtaining the changes not yet observed by the remote node according its version vector
+  /// passed in as an argument.
   public func payload(remoteNodes: [Node]) throws -> ReplicationPayload {
-    var models = [String: [any ReplicatingModel]]()
+    var models = [String: [any ModelDotPairProtocol]]()
     var localNodes = [Node]()
     var ranges = [EmptyRange]()
     try inTransaction { [unowned self] proxy in
       localNodes.append(contentsOf: try proxy.fetch(Node.self))
       let nodesForFetching = Node.mergeForEncoding(localNodes: localNodes, remoteNodes: remoteNodes)
 
-      for table in tables {
+      for table in tables.values {
         models[table.exampleInstance.tableName] = try fetch(proxy: proxy, type: table, nodes: nodesForFetching)
       }
 
@@ -26,10 +28,13 @@ extension ReplicationController {
     return ReplicationPayload(models: models, nodes: localNodes, ranges: ranges)
   }
 
+  /// Merge in the given payload.
   public func merge(_ payload: ReplicationPayload) throws {
     try inTransaction { [unowned self] localProxy in
-      for table in tables {
-        try merge(model: table.exampleInstance, nodeID: nodeID, time: time, localProxy: localProxy, payload: payload)
+      for modelDotPairs in payload.models.values {
+        for pair in modelDotPairs {
+          try merge(remoteModel: pair.model, dot: pair.dot, fkDots: pair.foreignKeyDots, proxy: localProxy)
+        }
       }
 
       let localNodes = try localProxy.fetch(Node.self)
@@ -43,14 +48,20 @@ extension ReplicationController {
     }
   }
 
-  private func isDeleted<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, model: T) throws -> Bool {
-    if let model = model as? any ChildReplicatingModel {
-      // Check if parent was deleted.
+  private class DeletedByForeignKeyVisitor<T: ReplicatingModel>: ForeignKeyVisitor {
+    func visit<Destination: DatabaseCodable>(_: ForeignKey<T, Destination>) {}
+  }
+
+  /// Check if the model with the corresponding dot has been observed to be deleted.
+  private func isDeleted<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, model _: T, dot: Dot,
+                                              fkDots: [ForeignKeyDot]) throws -> Bool
+  {
+    for foreignKey in fkDots {
       if try proxy
         .fetch(
           EmptyRange.self,
           allWhere: "node = ?1 AND start <= ?2 AND ?2 <= end",
-          [model.parentDot.parentCreator, model.parentDot.parentCreatedTime]
+          [foreignKey.parentCreator, foreignKey.parentCreatedTime]
         )
         .first != nil
       {
@@ -62,48 +73,44 @@ extension ReplicationController {
       .fetch(
         EmptyRange.self,
         allWhere: "node = ?1 AND start <= ?2 AND ?2 <= end",
-        [model.dot.creator, model.dot.createdTime]
+        [dot.creator, dot.createdTime]
       )
       .first != nil
   }
 
-  private func merge<T: ReplicatingModel>(model _: T,
-                                          nodeID _: UUID,
-                                          time _: Int64,
-                                          localProxy: LiteCrate.TransactionProxy,
-                                          payload: ReplicationPayload) throws
+  /// Merge in the given remote model and its corresponding dot.
+  private func merge<T: ReplicatingModel>(remoteModel: T, dot: Dot, fkDots: [ForeignKeyDot],
+                                          proxy: LiteCrate.TransactionProxy) throws
   {
-    let remoteModels = payload.models[T.exampleInstance.tableName]! // TODO: Throw error.
-
-    for remoteModel in remoteModels {
-      guard try !isDeleted(proxy: localProxy, model: remoteModel) else {
-        continue
-      }
-      // Get the local version; the one created later is the winner.
-      guard let localModel = try localProxy.fetch(T.self, with: remoteModel.id) else {
-        try localProxy.saveIgnoringDelegate(remoteModel)
-        continue
-      }
-
-      if localModel.dot < remoteModel.dot {
-        if !localModel.dot.isSameVersion(as: remoteModel.dot) {
-          try localProxy.delete(localModel)
-        }
-        try localProxy.saveIgnoringDelegate(remoteModel)
-      }
-      // TODO: If we're newer and different versions I think you could to EmptyRange -- but it would eventually get
-      // cleaned up after another round trip.
+    guard try !isDeleted(proxy: proxy, model: remoteModel, dot: dot, fkDots: fkDots) else {
+      return
     }
+    let modelDotPair = ModelDotPair(model: remoteModel, dot: dot, foreignKeyDots: fkDots)
+    // Get the local version; the one created later is the winner.
+    guard let localModel = try proxy.fetch(ModelDotPair<T>.self, with: remoteModel.id) else {
+      try proxy.saveIgnoringDelegate(modelDotPair)
+      return
+    }
+
+    if localModel.dot < remoteModel.dot {
+      if !localModel.dot.isSameVersion(as: remoteModel.dot) {
+        try proxy.delete(localModel)
+      }
+      try proxy.saveIgnoringDelegate(modelDotPair)
+    }
+    // TODO: If we're newer and different versions I think you could to EmptyRange -- but it would eventually get
+    // cleaned up after another round trip.
   }
 }
 
+/// Fetch the model-dot pairs for the given ReplicatingModel type.
 private func fetch<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, type _: T.Type,
-                                        nodes: [Node]) throws -> [any ReplicatingModel]
+                                        nodes: [Node]) throws -> [any ModelDotPairProtocol]
 {
-  var models: [T] = []
+  var models: [any ModelDotPairProtocol] = []
   for node in nodes {
     models.append(contentsOf: try proxy.fetchIgnoringDelegate(
-      T.self,
+      ModelDotPair<T>.self,
       allWhere: "lastModifier = ? AND sequenceNumber >= ?",
       [node.id, node.time]
     ))
@@ -124,15 +131,4 @@ private func fetchEmptyRanges(proxy: LiteCrate.TransactionProxy,
     ))
   }
   return ranges
-}
-
-private func populate<T: ReplicatingModel>(
-  instance _: T,
-  proxy: LiteCrate.TransactionProxy,
-  container: KeyedDecodingContainer<TableNameCodingKey>
-) throws {
-  let instances = try container.decode([T].self, forKey: TableNameCodingKey(stringValue: T.exampleInstance.tableName))
-  for instance in instances {
-    try proxy.saveIgnoringDelegate(instance)
-  }
 }

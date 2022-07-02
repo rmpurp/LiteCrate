@@ -19,9 +19,9 @@ private struct Parent: ReplicatingModel {
   }
 }
 
-private struct Child: ChildReplicatingModel {
+private struct Child: ReplicatingModel {
   var dot: Dot
-  var parent: Parent.Key
+  var parentID: Parent.Key
   var parentDot: ForeignKeyDot
   var value: String
   static var exampleInstance: Child {
@@ -30,15 +30,13 @@ private struct Child: ChildReplicatingModel {
 
   init(dot: Dot = Dot(), parent: Parent, value: String) {
     self.dot = dot
-    self.parent = parent.id
+    parentID = parent.id
     parentDot = ForeignKeyDot(parent: parent)
     self.value = value
   }
 
-  static var foreignKeys: [ForeignKey] {
-    [
-      ForeignKey("parent", references: "Parent", targetColumn: "id", onDelete: .noAction),
-    ]
+  var foreignKeyConstraints: FKConstraints<Self> {
+    ForeignKey<Self, _>(Parent.self, columnName: "parentID", action: .noAction, path: \.parentID)
   }
 }
 

@@ -75,7 +75,7 @@ public extension LiteCrate {
 
     /// Save the given model, bypassing any processing by the delegate.
     public func saveIgnoringDelegate<T: DatabaseCodable>(_ model: T) throws {
-      let encoder = DatabaseEncoder(tableName: T.exampleInstance.tableName)
+      let encoder = DatabaseEncoder(tableName: model.tableName)
       try model.encode(to: encoder)
       let (insertStatement, values) = encoder.insertStatement
       try db.execute(insertStatement, values)

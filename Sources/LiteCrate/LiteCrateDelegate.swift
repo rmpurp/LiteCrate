@@ -14,8 +14,9 @@ public protocol LiteCrateDelegate {
   func transactionDidEnd()
   func migration(didInitializeIn proxy: LiteCrate.TransactionProxy) throws
   func migration<A: MigrationAction>(willRun action: A) throws
-  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws -> T
-  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willDelete model: T) throws -> T?
+  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws -> any DatabaseCodable
+  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willDelete model: T) throws
+    -> (any DatabaseCodable)?
   func migrationActionDidRun<A: MigrationAction>(_ action: A) throws
   func liteCrate(_ crate: LiteCrate, encodingInto encoder: Encoder) throws
   func filter<T: DatabaseCodable>(model: T) throws -> Bool
@@ -27,8 +28,11 @@ public extension LiteCrateDelegate {
   func transactionDidEnd() {}
   func migration(didInitializeIn _: LiteCrate.TransactionProxy) throws {}
   func migration<A: MigrationAction>(willRun _: A) throws {}
-  func proxy<T: DatabaseCodable>(_: LiteCrate.TransactionProxy, willSave model: T) throws -> T { model }
-  func proxy<T: DatabaseCodable>(_: LiteCrate.TransactionProxy, willDelete _: T) throws -> T? { nil }
+  func proxy<T: DatabaseCodable>(_: LiteCrate.TransactionProxy,
+                                 willSave model: T) throws -> any DatabaseCodable { model }
+  func proxy<T: DatabaseCodable>(_: LiteCrate.TransactionProxy, willDelete _: T) throws -> (any DatabaseCodable)? { nil
+  }
+
   func migrationActionDidRun<A: MigrationAction>(_: A) throws {}
   func liteCrate(_: LiteCrate, encodingInto _: Encoder) throws {}
   func filter<T: DatabaseCodable>(model _: T) throws -> Bool { true }
