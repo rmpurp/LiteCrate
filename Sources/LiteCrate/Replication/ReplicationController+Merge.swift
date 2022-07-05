@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import LiteCrate
 
 extension ReplicationController {
   /// Obtain the payload, only obtaining the changes not yet observed by the remote node according its version vector

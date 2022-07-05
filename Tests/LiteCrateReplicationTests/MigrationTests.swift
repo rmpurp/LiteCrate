@@ -9,7 +9,6 @@ import Foundation
 import XCTest
 
 @testable import LiteCrate
-@testable import LiteCrateReplication
 
 private struct Employee: ReplicatingModel {
   static var exampleInstance: Employee {

@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import LiteCrate
 
 public struct Dot: Codable {
   /// The stable id of the model.

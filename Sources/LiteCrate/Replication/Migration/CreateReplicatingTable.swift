@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import LiteCrate
 
 public protocol ReplicatingTableMigrationAction: MigrationAction {
   func modifyReplicatingTables(

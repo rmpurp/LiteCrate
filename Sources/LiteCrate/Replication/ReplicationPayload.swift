@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import LiteCrate
 
 struct TableNameCodingKey: CodingKey {
   var stringValue: String

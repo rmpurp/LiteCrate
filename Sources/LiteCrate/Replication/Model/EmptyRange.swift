@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import LiteCrate
 
 /// A range of dots that represents the fact that no nondeleted elements were created in the range by the given Node.
 struct EmptyRange: DatabaseCodable, Identifiable {

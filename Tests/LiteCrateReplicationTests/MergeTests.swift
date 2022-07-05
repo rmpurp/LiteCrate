@@ -6,7 +6,6 @@
 //
 
 @testable import LiteCrate
-@testable import LiteCrateReplication
 import XCTest
 
 final class MergeTests: XCTestCase {

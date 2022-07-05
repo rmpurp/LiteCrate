@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import LiteCrate
 
 public protocol ReplicatingModel: DatabaseCodable<UUID>, Identifiable {
   var dot: Dot { get set }

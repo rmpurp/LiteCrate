@@ -7,7 +7,6 @@
 
 import Foundation
 @testable import LiteCrate
-@testable import LiteCrateReplication
 import XCTest
 
 protocol TestAction {

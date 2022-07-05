@@ -5,7 +5,7 @@
 //  Created by Ryan Purpura on 6/22/22.
 //
 
-@testable import LiteCrateReplication
+@testable import LiteCrate
 import XCTest
 
 private struct ModelA: ReplicatingModel, Equatable {

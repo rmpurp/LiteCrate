@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import LiteCrate
 
 protocol ModelDotPairProtocol: DatabaseCodable {
   var model: any ReplicatingModel { get }
