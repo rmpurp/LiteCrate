@@ -8,7 +8,7 @@
 import Foundation
 
 public protocol MigrationAction: MigrationStep {
-  func perform(in proxy: LiteCrate.TransactionProxy) throws
+  func perform(in proxy: TransactionProxy) throws
 }
 
 public extension MigrationAction {
@@ -25,7 +25,7 @@ public struct CreateTable<T: DatabaseCodable>: MigrationAction {
     creationStatement = SchemaEncoder(T.exampleInstance).creationStatement
   }
 
-  public func perform(in proxy: LiteCrate.TransactionProxy) throws {
+  public func perform(in proxy: TransactionProxy) throws {
     try proxy.execute(creationStatement)
   }
 }
@@ -37,7 +37,7 @@ public struct Execute: MigrationAction {
     self.statement = statement
   }
 
-  public func perform(in proxy: LiteCrate.TransactionProxy) throws {
+  public func perform(in proxy: TransactionProxy) throws {
     try proxy.execute(statement)
   }
 }

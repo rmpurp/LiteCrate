@@ -26,11 +26,11 @@ class ReplicationController: LiteCrateDelegate {
   }
 
   @discardableResult
-  public func inTransaction<T>(block: @escaping (LiteCrate.TransactionProxy) throws -> T) throws -> T {
+  public func inTransaction<T>(block: @escaping (TransactionProxy) throws -> T) throws -> T {
     try liteCrate.inTransaction(block: block)
   }
 
-  func migration(didInitializeIn proxy: LiteCrate.TransactionProxy) throws {
+  func migration(didInitializeIn proxy: TransactionProxy) throws {
     try proxy.execute("CREATE TABLE Node (id TEXT PRIMARY KEY, time INT NOT NULL, minTime INT NOT NULL)")
     try proxy
       .execute(SchemaEncoder(EmptyRange.exampleInstance).creationStatement)
@@ -43,7 +43,7 @@ class ReplicationController: LiteCrateDelegate {
     }
   }
 
-  func transaction(didBeginIn proxy: LiteCrate.TransactionProxy) throws {
+  func transaction(didBeginIn proxy: TransactionProxy) throws {
     try proxy.execute("PRAGMA defer_foreign_keys = TRUE")
     let cursor = try proxy.query("SELECT time FROM Node WHERE id = ?", [nodeID])
     guard cursor.step() else { fatalError("Corrupt database.") }
@@ -51,16 +51,16 @@ class ReplicationController: LiteCrateDelegate {
     transactionTime = time
   }
 
-  func transaction(willCommitIn proxy: LiteCrate.TransactionProxy) throws {
+  func transaction(willCommitIn proxy: TransactionProxy) throws {
     try proxy.execute("UPDATE Node SET time = ? WHERE id = ?", [time, nodeID])
   }
 
   class ForeignKeyDotCollector<T: ReplicatingModel>: ForeignKeyVisitor {
-    private let proxy: LiteCrate.TransactionProxy
+    private let proxy: TransactionProxy
     var dots = [ForeignKeyDot]()
     var model: T
 
-    init(_ proxy: LiteCrate.TransactionProxy, model: T) {
+    init(_ proxy: TransactionProxy, model: T) {
       self.proxy = proxy
       self.model = model
       self.model.foreignKeyConstraints.visit(by: self)
@@ -81,7 +81,7 @@ class ReplicationController: LiteCrateDelegate {
     }
   }
 
-  private func handleReplicatingModel<T: ReplicatingModel>(_ proxy: LiteCrate.TransactionProxy,
+  private func handleReplicatingModel<T: ReplicatingModel>(_ proxy: TransactionProxy,
                                                            model: T) throws -> any DatabaseCodable
   {
     var dot = model.dot
@@ -91,14 +91,14 @@ class ReplicationController: LiteCrateDelegate {
     return model.toErasedModelDot(dot: dot, fkDots: collector.dots)
   }
 
-  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy, willSave model: T) throws -> any DatabaseCodable {
+  func proxy<T: DatabaseCodable>(_ proxy: TransactionProxy, willSave model: T) throws -> any DatabaseCodable {
     if let model = model as? any ReplicatingModel {
       return try handleReplicatingModel(proxy, model: model)
     }
     return model
   }
 
-  func proxy<T: DatabaseCodable>(_ proxy: LiteCrate.TransactionProxy,
+  func proxy<T: DatabaseCodable>(_ proxy: TransactionProxy,
                                  willDelete model: T) throws -> (any DatabaseCodable)?
   {
     if let model = model as? (any ReplicatingModel) {
@@ -139,7 +139,7 @@ class ReplicationController: LiteCrateDelegate {
 }
 
 extension ReplicationController {
-  func addAndMerge(_ proxy: LiteCrate.TransactionProxy, range: EmptyRange, deleteModels: Bool = false) throws {
+  func addAndMerge(_ proxy: TransactionProxy, range: EmptyRange, deleteModels: Bool = false) throws {
     var range = range
     let conflictingRanges = try proxy.fetch(
       EmptyRange.self,
@@ -161,7 +161,7 @@ extension ReplicationController {
     try proxy.save(range)
   }
 
-  private func deleteAll<T: ReplicatingModel>(_ proxy: LiteCrate.TransactionProxy, type _: T.Type,
+  private func deleteAll<T: ReplicatingModel>(_ proxy: TransactionProxy, type _: T.Type,
                                               in range: EmptyRange) throws
   {
     for fkDot in ModelDotPair<T>.exampleInstance.foreignKeyDots {

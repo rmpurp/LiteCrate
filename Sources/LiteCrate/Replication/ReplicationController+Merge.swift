@@ -52,7 +52,7 @@ extension ReplicationController {
   }
 
   /// Check if the model with the corresponding dot has been observed to be deleted.
-  private func isDeleted<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, model _: T, dot: Dot,
+  private func isDeleted<T: ReplicatingModel>(proxy: TransactionProxy, model _: T, dot: Dot,
                                               fkDots: [ForeignKeyDot]) throws -> Bool
   {
     for foreignKey in fkDots {
@@ -79,7 +79,7 @@ extension ReplicationController {
 
   /// Merge in the given remote model and its corresponding dot.
   private func merge<T: ReplicatingModel>(remoteModel: T, dot: Dot, fkDots: [ForeignKeyDot],
-                                          proxy: LiteCrate.TransactionProxy) throws
+                                          proxy: TransactionProxy) throws
   {
     guard try !isDeleted(proxy: proxy, model: remoteModel, dot: dot, fkDots: fkDots) else {
       return
@@ -103,7 +103,7 @@ extension ReplicationController {
 }
 
 /// Fetch the model-dot pairs for the given ReplicatingModel type.
-private func fetch<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, type _: T.Type,
+private func fetch<T: ReplicatingModel>(proxy: TransactionProxy, type _: T.Type,
                                         nodes: [Node]) throws -> [any ModelDotPairProtocol]
 {
   var models: [any ModelDotPairProtocol] = []
@@ -118,7 +118,7 @@ private func fetch<T: ReplicatingModel>(proxy: LiteCrate.TransactionProxy, type 
 }
 
 // TODO: somehow combine with above.
-private func fetchEmptyRanges(proxy: LiteCrate.TransactionProxy,
+private func fetchEmptyRanges(proxy: TransactionProxy,
                               nodes: [Node]) throws -> [EmptyRange]
 {
   var ranges: [EmptyRange] = []

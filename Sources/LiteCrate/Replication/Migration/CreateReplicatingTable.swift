@@ -26,7 +26,7 @@ public struct CreateReplicatingTable<T: ReplicatingModel>: ReplicatingTableMigra
     creationStatement = encoder.creationStatement
   }
 
-  public func perform(in proxy: LiteCrate.TransactionProxy) throws {
+  public func perform(in proxy: TransactionProxy) throws {
     try proxy.execute(creationStatement)
   }
 
