@@ -188,36 +188,3 @@ extension ReplicationController {
     }
   }
 }
-
-protocol A {
-  associatedtype TableDescriptionType: TableDescription
-  @TableDescriptionBuilder
-  var description: TableDescriptionType { get }
-  
-  
-}
-
-struct TableDescription<ModelType: A> {
-//  associatedtype ModelType: A
-}
-
-struct B: A {
-  var description: some TableDescription {
-    Self.self
-    "arst"
-  }
-}
-
-struct TableDescriptionImpl<T: A>: TableDescription {
-  typealias ModelType = T
-  let cols: [String]
-}
-
-@resultBuilder
-struct TableDescriptionBuilder {
-  static func buildBlock<T: A>(_ type: T.Type, _ components: String...) -> some TableDescription {
-    return TableDescriptionImpl<T>(cols: components)
-  }
-}
-
-
