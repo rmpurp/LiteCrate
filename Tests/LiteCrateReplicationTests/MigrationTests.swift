@@ -17,6 +17,10 @@ private struct Employee: ReplicatingModel {
 
   var name: String
   var dot: Dot = .init()
+  
+  static let table = Table("Person") {
+    Column(CodingKeys.name, type: .nullableText)
+  }
 }
 
 private struct Boss: ReplicatingModel {
@@ -38,5 +42,16 @@ final class MigrationTests: XCTestCase {
     }
 
     XCTAssertEqual(controller.tables.count, 2)
+  }
+  
+  func test() {
+    let table = Table("Person") {
+      Column(name: "id", type: .text).primaryKey()
+      Column(name: "name", type: .text)
+      Column(name: "age", type: .nullableText)
+      Column(name: "parent", type: .nullableText).foreignKey(foreignTable: "Person")
+    }
+    print(table.createTableStatement())
+    print(table.selectStatement())
   }
 }

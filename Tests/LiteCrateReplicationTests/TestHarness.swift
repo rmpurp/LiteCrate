@@ -188,7 +188,7 @@ struct Merge: TestAction {
   init(
     fromID: Int,
     toID: Int,
-    debugValue: Int = -1,
+      debugValue: Int = -1,
     payloadValues: [Int64]? = nil,
     file: StaticString = #filePath,
     line: UInt = #line
