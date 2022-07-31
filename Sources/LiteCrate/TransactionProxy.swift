@@ -10,21 +10,21 @@ import LiteCrateCore
 
 public final class TransactionProxy {
   public func fetch<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type, with primaryKey: U) throws -> T? {
-    try fetch(type, allWhere: "\(T.primaryKeyColumn) = ?", [primaryKey]).first
+    try fetch(type, allWhere: "\(T.table.primaryKeyColumn) = ?", [primaryKey]).first
   }
 
   public func fetchIgnoringDelegate<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type,
                                                                                 with primaryKey: U) throws -> T?
   {
-    try fetchIgnoringDelegate(type, allWhere: "\(T.primaryKeyColumn) = ?", [primaryKey]).first
+    try fetchIgnoringDelegate(type, allWhere: "\(T.table.primaryKeyColumn) = ?", [primaryKey]).first
   }
 
   public func fetch<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
                                         _ values: [SqliteRepresentable?] = []) throws -> [T]
   {
     let sqlWhereClause = sqlWhereClause ?? "TRUE"
-
-    let cursor = try db.query("\(selectStatement(T.self)) WHERE \(sqlWhereClause)", values)
+    
+    let cursor = try db.query(T.table.selectStatement(where: sqlWhereClause), values)
     let decoder = DatabaseDecoder(cursor: cursor)
     var models = [T]()
     while cursor.step() {
@@ -43,14 +43,7 @@ public final class TransactionProxy {
   public func fetchIgnoringDelegate<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
                                                         _ values: [SqliteRepresentable?] = []) throws -> [T]
   {
-    let sqlWhereClause = sqlWhereClause ?? "TRUE"
-    let cursor = try db.query("\(selectStatement(T.self)) WHERE \(sqlWhereClause)", values)
-    let decoder = DatabaseDecoder(cursor: cursor)
-    var models = [T]()
-    while cursor.step() {
-      models.append(try T(from: decoder))
-    }
-    return models
+    fatalError()
   }
 
   public func execute(_ sql: String, _ values: [SqliteRepresentable?] = []) throws {
@@ -74,7 +67,7 @@ public final class TransactionProxy {
 
   /// Save the given model, bypassing any processing by the delegate.
   public func saveIgnoringDelegate<T: DatabaseCodable>(_ model: T) throws {
-    let encoder = DatabaseEncoder(tableName: model.tableName)
+    let encoder = DatabaseEncoder(tableName: T.table.tableName)
     try model.encode(to: encoder)
     let (insertStatement, values) = encoder.insertStatement
     try db.execute(insertStatement, values)
@@ -89,10 +82,12 @@ public final class TransactionProxy {
   }
 
   public func deleteIgnoringDelegate<T: DatabaseCodable>(_ model: T) throws {
-    try db.execute(
-      "DELETE FROM \(T.exampleInstance.tableName) WHERE \(T.primaryKeyColumn) = ?",
-      [model.primaryKeyValue]
-    )
+    fatalError()
+    #warning("fix me")
+//    try db.execute(
+//      "DELETE FROM \(T.exampleInstance.tableName) WHERE \(T.primaryKeyColumn) = ?",
+//      [model.primaryKeyValue]
+//    )
   }
 
   public func delete<T: DatabaseCodable, U: SqliteRepresentable>(_: T.Type, with primaryKey: U) throws {
@@ -104,7 +99,7 @@ public final class TransactionProxy {
                                                          _ values: [SqliteRepresentable?] = []) throws
   {
     let sqlWhereClause = sqlWhereClause.flatMap { "WHERE \($0)" } ?? ""
-    try db.execute("DELETE FROM \(T.exampleInstance.tableName) \(sqlWhereClause)", values)
+    try db.execute("DELETE FROM \(T.table.tableName) \(sqlWhereClause)", values)
   }
 
   public func delete<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
@@ -142,14 +137,5 @@ internal extension TransactionProxy {
   func setCurrentSchemaVersion(version: Int64) throws {
     try execute(String(format: "PRAGMA user_version = %lld", version), [])
     // Being very careful to avoid injection vulnerability; ? is not valid here.
-  }
-}
-
-internal extension TransactionProxy {
-  /// For the given table, get a String of the format `SELECT col1 AS col1,col2 AS col2,... FROM tableName`
-  private func selectStatement<T: DatabaseCodable>(_: T.Type) throws -> String {
-    let encoder = SchemaEncoder(T.exampleInstance)
-    try T.exampleInstance.encode(to: encoder)
-    return encoder.selectStatement
   }
 }

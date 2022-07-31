@@ -22,7 +22,7 @@ public extension MigrationAction {
 public struct CreateTable<T: DatabaseCodable>: MigrationAction {
   let creationStatement: String
   init(_: T.Type) {
-    creationStatement = SchemaEncoder(T.exampleInstance).creationStatement
+    creationStatement = T.table.createTableStatement()
   }
 
   public func perform(in proxy: TransactionProxy) throws {

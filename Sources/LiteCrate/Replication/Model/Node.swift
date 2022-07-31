@@ -11,6 +11,11 @@ struct Node: DatabaseCodable, Identifiable {
   var id: UUID
   var minTime: Int64
   var time: Int64
+  
+  static var table: Table {
+    #warning("Remove this")
+    fatalError()
+  }
 
   static var exampleInstance: Node = .init(id: UUID(), minTime: 0, time: 0)
 

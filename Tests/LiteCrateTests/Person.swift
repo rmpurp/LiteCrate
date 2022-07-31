@@ -9,6 +9,13 @@ import Foundation
 @testable import LiteCrate
 
 struct Person: DatabaseCodable, Identifiable {
+  static var table = Table("Person") {
+    Column(name: "id", type: .text).primaryKey()
+    Column(name: "name", type: .text)
+    Column(name: "birthday", type: .nullableInteger)
+    Column(name: "dogID", type: .text)
+  }
+  
   var id: UUID = .init()
   var name: String
   var birthday: Date?

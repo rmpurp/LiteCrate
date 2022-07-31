@@ -12,33 +12,38 @@ struct EmptyRange: DatabaseCodable, Identifiable {
   /// The id of the range.
   var id: UUID
   /// The node for which this range applied.
-  var node: Node.Key
+  var node: UUID
   /// The start of the range (inclusive).
   var start: Int64
   /// The end ot the range (inclusive).
   var end: Int64
   /// The last node to modify this range.
-  var lastModifier: Node.Key
-  /// The time (WRT to the lastModifier) that this range was last updated; for efficient delta updates only.
+  var sequencer: UUID
+  /// The time (WRT to the sequencer) that this range was last updated; for efficient delta updates only.
   var sequenceNumber: Int64
 
-  static var exampleInstance: EmptyRange {
-    EmptyRange(node: UUID(), start: 0, end: 0, lastModifier: UUID(), sequenceNumber: 0)
+  static var table = Table("EmptyRange") {
+    Column(name: "id", type: .text)
+    Column(name: "node", type: .text)
+    Column(name: "start", type: .integer)
+    Column(name: "end", type: .integer)
+    Column(name: "lastModifier", type: .text)
+    Column(name: "sequenceNumber", type: .integer)
   }
-
-  init(node: Node.Key, start: Int64, end: Int64, lastModifier: Node.Key, sequenceNumber: Int64) {
+  
+  init(node: UUID, start: Int64, end: Int64, sequencer: UUID, sequenceNumber: Int64) {
     id = UUID()
     self.start = start
     self.end = end
     self.node = node
-    self.lastModifier = lastModifier
+    self.sequencer = sequencer
     self.sequenceNumber = sequenceNumber
   }
 }
 
 extension EmptyRange: CustomDebugStringConvertible {
   var debugDescription: String {
-    "EmptyRange(id:\(id.short), node:\(node.short), \(start)->\(end), lastModifier:\(lastModifier.short), seqNum:\(sequenceNumber))"
+    "EmptyRange(id:\(id.short), node:\(node.short), \(start)->\(end), lastModifier:\(sequencer.short), seqNum:\(sequenceNumber))"
   }
 }
 

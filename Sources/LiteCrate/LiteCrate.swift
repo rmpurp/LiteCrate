@@ -35,6 +35,7 @@ public class LiteCrate {
 
     // interpret the current version as "Next migration to run"
     var currentVersion = try proxy.getCurrentSchemaVersion()
+    
     if currentVersion == 0 {
       try delegate?.migration(didInitializeIn: proxy)
       currentVersion = 1
