@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 7/18/22.
 //
@@ -30,10 +30,11 @@ protocol ColumnProtocol {
   /// The constraints for the column in a replicating context.
   /// This typically includes additional foreign keys to metadata tables.
   func replicatingConstraintDefinitions(primaryKeyColumnName: String) -> [String]
-  /// The name of the column.
+  /// If the column is a primary key.
   func isPrimaryKeyColumn() -> Bool
-  /// The name of the column.
+  /// If the column is a foreign key. Not mutually exclusive with the above.
   func isForeignKeyColumn() -> Bool
+  /// The name of the column.
   var name: String { get }
 }
 
@@ -42,126 +43,125 @@ extension ColumnProtocol {
   func primaryKey() -> PrimaryKeyColumn<Self> {
     PrimaryKeyColumn(column: self)
   }
-  
+
   /// Use this modifier to mark this column as a ForeignKey
   func foreignKey(foreignTable: String, foreignColumn: String = "id") -> ForeignKeyColumn<Self> {
-    ForeignKeyColumn(baseColumn: self, foreignTable: foreignTable, foreignColumn: foreignColumn )
+    ForeignKeyColumn(baseColumn: self, foreignTable: foreignTable, foreignColumn: foreignColumn)
   }
 }
 
 /// A normal column of a table, with no constraints.
 struct Column: ColumnProtocol {
-  func replicatingConstraintDefinitions(primaryKeyColumnName: String) -> [String] {
-    []
+  let name: String
+  let type: SqliteType
+
+  init(name: String, type: SqliteType) {
+    self.name = name
+    self.type = type
   }
-  
+
+  init<C: CodingKey>(_ codingKey: C, type: SqliteType) {
+    name = codingKey.stringValue
+    self.type = type
+  }
+
   func columnDefinition() -> String {
     "\(name) \(type.rawValue)"
   }
-  
+
   func constraintDefinitions() -> [String] {
     []
   }
-  
-  func replicatingConstraintDefinitions() -> [String] {
+
+  func replicatingConstraintDefinitions(primaryKeyColumnName _: String) -> [String] {
     []
-  }
-  
-  func primaryKeyColumnNameIfPrimaryKeyColumn() -> String? {
-    return nil
   }
 
   func isPrimaryKeyColumn() -> Bool {
     false
   }
-  
+
   func isForeignKeyColumn() -> Bool {
     false
-  }
-  
-  let name: String
-  let type: SqliteType
-  
-  init(name: String, type: SqliteType) {
-    self.name = name
-    self.type = type
-  }
-  
-  init<C: CodingKey>(_ codingKey: C, type: SqliteType) {
-    self.name = codingKey.stringValue
-    self.type = type
   }
 }
 
 /// A primary key column.
 struct PrimaryKeyColumn<C: ColumnProtocol>: ColumnProtocol {
-  func replicatingConstraintDefinitions(primaryKeyColumnName: String) -> [String] {
-    var constraints = baseColumn.replicatingConstraintDefinitions(primaryKeyColumnName: primaryKeyColumnName)
-    constraints.append("FOREIGN KEY (\(name)) REFERENCES ObjectRecord ON DELETE CASCADE")
-    return constraints
-  }
-  
-  func isPrimaryKeyColumn() -> Bool {
-    true
-  }
-  
-  func isForeignKeyColumn() -> Bool {
-    baseColumn.isForeignKeyColumn()
-  }
-  
   let baseColumn: C
-  
-  func columnDefinition() -> String {
-    baseColumn.columnDefinition()
-  }
-  
-  func constraintDefinitions() -> [String] {
-    var constraints = baseColumn.constraintDefinitions()
-    constraints.append("PRIMARY KEY (\(name))")
-    return constraints
-  }
-  
   var name: String { baseColumn.name }
 
   init(column: C) {
     baseColumn = column
   }
+
+  func columnDefinition() -> String {
+    baseColumn.columnDefinition()
+  }
+
+  func constraintDefinitions() -> [String] {
+    var constraints = baseColumn.constraintDefinitions()
+    constraints.append("PRIMARY KEY (\(name))")
+    return constraints
+  }
+
+  func replicatingConstraintDefinitions(primaryKeyColumnName: String) -> [String] {
+    var constraints = baseColumn.replicatingConstraintDefinitions(primaryKeyColumnName: primaryKeyColumnName)
+    constraints.append("FOREIGN KEY (\(name)) REFERENCES ObjectRecord ON DELETE CASCADE")
+    return constraints
+  }
+
+  func isPrimaryKeyColumn() -> Bool {
+    true
+  }
+
+  func isForeignKeyColumn() -> Bool {
+    baseColumn.isForeignKeyColumn()
+  }
 }
 
 /// A column that is a foreign key.
 struct ForeignKeyColumn<C: ColumnProtocol>: ColumnProtocol {
-  func isPrimaryKeyColumn() -> Bool {
-    baseColumn.isPrimaryKeyColumn()
+  var name: String { baseColumn.name }
+
+  let baseColumn: C
+  let foreignTable: String
+  let foreignColumn: String
+  var onDeleteAction: OnDeleteAction
+
+  init(baseColumn: C, foreignTable: String, foreignColumn: String,
+       onDelete onDeleteAction: OnDeleteAction = .noAction)
+  {
+    self.baseColumn = baseColumn
+    self.foreignTable = foreignTable
+    self.foreignColumn = foreignColumn
+    self.onDeleteAction = onDeleteAction
   }
-  
-  func isForeignKeyColumn() -> Bool {
-    true
-  }
-  
+
   func columnDefinition() -> String {
-    return baseColumn.columnDefinition()
+    baseColumn.columnDefinition()
   }
-  
+
   func constraintDefinitions() -> [String] {
     var constraints = baseColumn.constraintDefinitions()
     constraints.append("FOREIGN KEY (\(name)) REFERENCES \(foreignTable)(\(foreignColumn)) \(onDeleteAction.clause)")
     return constraints
   }
-  
+
   func replicatingConstraintDefinitions(primaryKeyColumnName: String) -> [String] {
     var constraints = baseColumn.replicatingConstraintDefinitions(primaryKeyColumnName: primaryKeyColumnName)
     constraints.append("FOREIGN KEY (primaryKeyColumnName, \(name)) REFERENCES ForeignKeyField ON DELETE RESTRICT")
     return constraints
   }
 
-  
-  var name: String { baseColumn.name }
-  
-  let baseColumn: C
-  let foreignTable: String
-  let foreignColumn: String
-  var onDeleteAction: OnDeleteAction
-  
+  func isPrimaryKeyColumn() -> Bool {
+    baseColumn.isPrimaryKeyColumn()
+  }
+
+  func isForeignKeyColumn() -> Bool {
+    true
+  }
+
   /// What to do when the referenced row is deleted.
   enum OnDeleteAction {
     case noAction
@@ -169,7 +169,7 @@ struct ForeignKeyColumn<C: ColumnProtocol>: ColumnProtocol {
     case setNull
     case setDefault
     case cascade
-    
+
     var clause: String {
       switch self {
       case .noAction: return "ON DELETE NO ACTION"
@@ -180,18 +180,11 @@ struct ForeignKeyColumn<C: ColumnProtocol>: ColumnProtocol {
       }
     }
   }
-  
-  init(baseColumn: C, foreignTable: String, foreignColumn: String, onDelete onDeleteAction: OnDeleteAction = .noAction) {
-    self.baseColumn = baseColumn
-    self.foreignTable = foreignTable
-    self.foreignColumn = foreignColumn
-    self.onDeleteAction = onDeleteAction
-  }
 }
 
 @resultBuilder
-struct TableBuilder {
-  static func buildBlock(_ components: any ColumnProtocol...) ->  [any ColumnProtocol] {
+enum TableBuilder {
+  static func buildBlock(_ components: any ColumnProtocol...) -> [any ColumnProtocol] {
     components
   }
 }
@@ -202,37 +195,13 @@ public struct Table {
   let tableName: String
   let columns: [any ColumnProtocol]
   let primaryKeyColumn: String
-  
+
   init(_ tableName: String, @TableBuilder _ builder: () -> [any ColumnProtocol]) {
     self.tableName = tableName
-    self.columns = builder()
-    self.primaryKeyColumn = Table.primaryKeyColumn(from: self.columns)
+    columns = builder()
+    primaryKeyColumn = Table.primaryKeyColumn(from: columns)
   }
-  
-  func createTableStatement() -> String {
-    var columnDefinitions = [String]()
-    var columnConstraints = [String]()
-    for column in columns {
-      columnDefinitions.append(column.columnDefinition())
-      columnConstraints.append(contentsOf: column.constraintDefinitions())
-    }
-    
-    let combined = (columnDefinitions + columnConstraints).joined(separator: ",\n    ")
-    return "CREATE TABLE \(tableName) (\n    \(combined)\n)"
-  }
-  
-  func createReplicatingTableStatement() -> String {
-    var columnDefinitions = [String]()
-    var columnConstraints = [String]()
-    for column in columns {
-      columnDefinitions.append(column.columnDefinition())
-      columnConstraints.append(contentsOf: column.replicatingConstraintDefinitions(primaryKeyColumnName: primaryKeyColumn))
-    }
-    
-    let combined = (columnDefinitions + columnConstraints).joined(separator: ",\n    ")
-    return "CREATE TABLE \(tableName) (\n    \(combined)\n)"
-  }
-  
+
   static func primaryKeyColumn(from columns: [any ColumnProtocol]) -> String {
     for column in columns {
       if column.isPrimaryKeyColumn() {
@@ -241,7 +210,7 @@ public struct Table {
     }
     fatalError("No primary key column defined.")
   }
-  
+
   func forEachForeignKey(_ block: (String) -> Void) {
     for column in columns {
       if column.isForeignKeyColumn() {
@@ -249,16 +218,45 @@ public struct Table {
       }
     }
   }
-  
+
+  func createTableStatement() -> String {
+    var columnDefinitions = [String]()
+    var columnConstraints = [String]()
+    for column in columns {
+      columnDefinitions.append(column.columnDefinition())
+      columnConstraints.append(contentsOf: column.constraintDefinitions())
+    }
+
+    let combined = (columnDefinitions + columnConstraints).joined(separator: ",\n    ")
+    return "CREATE TABLE \(tableName) (\n    \(combined)\n)"
+  }
+
+  func createReplicatingTableStatement() -> String {
+    var columnDefinitions = [String]()
+    var columnConstraints = [String]()
+    for column in columns {
+      columnDefinitions.append(column.columnDefinition())
+      columnConstraints
+        .append(contentsOf: column.replicatingConstraintDefinitions(primaryKeyColumnName: primaryKeyColumn))
+    }
+
+    let combined = (columnDefinitions + columnConstraints).joined(separator: ",\n    ")
+    return "CREATE TABLE \(tableName) (\n    \(combined)\n)"
+  }
+
   func selectStatement(where whereClause: String = "TRUE") -> String {
     let selectColumns = columns.lazy
-      .map { "\($0.name) AS \($0.name)"}
+      .map { "\($0.name) AS \($0.name)" }
       .joined(separator: ", ")
     return "SELECT \(selectColumns) FROM \(tableName) WHERE \(whereClause)"
   }
-  
+
   func insertStatement() -> String {
-    #warning("FIX ME")
-    fatalError()
+    let insertColumns = columns.lazy
+      .map { "\($0.name)" }
+      .joined(separator: ",")
+
+    let placeholders = [String](repeating: "?", count: columns.count).joined(separator: ",")
+    return "INSERT INTO \(tableName)(\(insertColumns)) VALUES (\(placeholders))"
   }
 }

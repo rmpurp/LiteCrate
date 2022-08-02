@@ -23,7 +23,7 @@ public final class TransactionProxy {
                                         _ values: [SqliteRepresentable?] = []) throws -> [T]
   {
     let sqlWhereClause = sqlWhereClause ?? "TRUE"
-    
+
     let cursor = try db.query(T.table.selectStatement(where: sqlWhereClause), values)
     let decoder = DatabaseDecoder(cursor: cursor)
     var models = [T]()
@@ -40,8 +40,8 @@ public final class TransactionProxy {
     return models
   }
 
-  public func fetchIgnoringDelegate<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
-                                                        _ values: [SqliteRepresentable?] = []) throws -> [T]
+  public func fetchIgnoringDelegate<T: DatabaseCodable>(_: T.Type, allWhere _: String? = nil,
+                                                        _: [SqliteRepresentable?] = []) throws -> [T]
   {
     fatalError()
   }
@@ -81,7 +81,7 @@ public final class TransactionProxy {
     }
   }
 
-  public func deleteIgnoringDelegate<T: DatabaseCodable>(_ model: T) throws {
+  public func deleteIgnoringDelegate<T: DatabaseCodable>(_: T) throws {
     fatalError()
     #warning("fix me")
 //    try db.execute(

@@ -15,7 +15,7 @@ struct Person: DatabaseCodable, Identifiable {
     Column(name: "birthday", type: .nullableInteger)
     Column(name: "dogID", type: .text)
   }
-  
+
   var id: UUID = .init()
   var name: String
   var birthday: Date?

@@ -14,7 +14,7 @@ protocol TestAction {
 }
 
 struct TestModel: ReplicatingModel {
-  var id: UUID = UUID()
+  var id: UUID = .init()
   var value: Int64
 
   static var table = Table("ChildModel") {
@@ -30,11 +30,11 @@ struct ChildModel: ReplicatingModel {
   var value: Int64
 
   init(value: Int64, parent: TestModel) {
-    self.id = UUID()
+    id = UUID()
     self.value = value
     self.parent = parent.id
   }
-  
+
   static var table = Table("ChildModel") {
     Column(name: "id", type: .text).primaryKey()
     Column(name: "parent", type: .text).foreignKey(foreignTable: "TestModel")
@@ -55,7 +55,7 @@ struct CreateDatabase: TestAction {
     }
   }
 
-  func perform(_ harness: TestHarness) throws {
+  func perform(_: TestHarness) throws {
 //    let id = uuid(for: databaseID)
 //    print("Creating database with id \(databaseID) -> \(id)")
 //    harness.databases[databaseID] = try ReplicationController(location: ":memory:", nodeID: id) {
@@ -78,7 +78,7 @@ struct AddChild: TestAction {
     self.id = id
   }
 
-  func perform(_ harness: TestHarness) throws {
+  func perform(_: TestHarness) throws {
 //    print("Adding \(value) to database \(databaseID)")
 //    try harness.databases[databaseID]!.inTransaction { proxy in
 //      let parent = try proxy.fetch(TestModel.self, allWhere: "value = ?", [parentValue]).first!
@@ -102,7 +102,7 @@ struct DeleteChild: TestAction {
   let databaseID: Int
   let value: Int64
 
-  func perform(_ harness: TestHarness) throws {
+  func perform(_: TestHarness) throws {
 //    print("Deleting child \(value) from database \(databaseID)")
 //    try harness.databases[databaseID]!.inTransaction { proxy in
 //      guard let model = try proxy.fetch(ChildModel.self, allWhere: "value = ?", [value]).first else {
@@ -125,7 +125,7 @@ struct Add: TestAction {
     self.id = id
   }
 
-  func perform(_ harness: TestHarness) throws {
+  func perform(_: TestHarness) throws {
 //    print("Adding \(value) to database \(databaseID)")
 //    try harness.databases[databaseID]!.inTransaction { proxy in
 //      var model = TestModel(value: value)
@@ -147,7 +147,7 @@ struct Delete: TestAction {
   let databaseID: Int
   let value: Int64
 
-  func perform(_ harness: TestHarness) throws {
+  func perform(_: TestHarness) throws {
 //    print("Deleting \(value) from database \(databaseID)")
 //    try harness.databases[databaseID]!.inTransaction { proxy in
 //      guard let model = try proxy.fetch(TestModel.self, allWhere: "value = ?", [value]).first else {
@@ -164,7 +164,7 @@ struct Modify: TestAction {
   let oldValue: Int64
   let newValue: Int64
 
-  func perform(_ harness: TestHarness) throws {
+  func perform(_: TestHarness) throws {
 //    print("Modifying \(oldValue) int database \(databaseID) to \(newValue)")
 //    try harness.databases[databaseID]!.inTransaction { proxy in
 //      guard var model = try proxy.fetch(TestModel.self, allWhere: "value = ?", [oldValue]).first else {
@@ -188,7 +188,7 @@ struct Merge: TestAction {
   init(
     fromID: Int,
     toID: Int,
-      debugValue: Int = -1,
+    debugValue: Int = -1,
     payloadValues: [Int64]? = nil,
     file: StaticString = #filePath,
     line: UInt = #line
@@ -201,7 +201,7 @@ struct Merge: TestAction {
     self.line = line
   }
 
-  func perform(_ harness: TestHarness) throws {
+  func perform(_: TestHarness) throws {
 //    print("Merging \(fromID) to \(toID)")
 //    let clocks = try harness.databases[toID]!.clocks()
 //    let payload = try harness.databases[fromID]!.payload(remoteNodes: clocks)
@@ -231,7 +231,7 @@ struct Verify: TestAction {
     self.line = line
   }
 
-  func perform(_ harness: TestHarness) throws {
+  func perform(_: TestHarness) throws {
 //    print("Verifying \(databaseID) contains \(values)")
 //    try harness.databases[databaseID]!.inTransaction { proxy in
 //      let actualValues = try proxy.fetch(TestModel.self).map(\.value)
@@ -255,7 +255,7 @@ struct VerifyChildren: TestAction {
     self.line = line
   }
 
-  func perform(_ harness: TestHarness) throws {
+  func perform(_: TestHarness) throws {
 //    print("Verifying \(databaseID) contains \(values) for children")
 //    try harness.databases[databaseID]!.inTransaction { proxy in
 //      let actualValues = try proxy.fetch(ChildModel.self).map(\.value)

@@ -21,7 +21,7 @@ final class MigrationTests: XCTestCase {
 //
 //    XCTAssertEqual(controller.tables.count, 2)
 //  }
-  
+
   func test() {
     let table = Table("Person") {
       Column(name: "id", type: .text).primaryKey()
@@ -31,5 +31,6 @@ final class MigrationTests: XCTestCase {
     }
     print(table.createTableStatement())
     print(table.selectStatement())
+    print(table.insertStatement())
   }
 }

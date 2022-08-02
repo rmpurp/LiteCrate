@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 7/31/22.
 //
@@ -17,7 +17,7 @@ struct ObjectRecord: Codable {
   var sequencer: UUID
   var sequenceNumber: Int64
   var lamport: Int64
-  
+
   static var table = Table("ObjectRecord") {
     Column(name: "id", type: .text).primaryKey()
     Column(name: "creator", type: .text)

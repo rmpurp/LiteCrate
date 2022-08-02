@@ -30,7 +30,7 @@ struct EmptyRange: DatabaseCodable, Identifiable {
     Column(name: "lastModifier", type: .text)
     Column(name: "sequenceNumber", type: .integer)
   }
-  
+
   init(node: UUID, start: Int64, end: Int64, sequencer: UUID, sequenceNumber: Int64) {
     id = UUID()
     self.start = start
