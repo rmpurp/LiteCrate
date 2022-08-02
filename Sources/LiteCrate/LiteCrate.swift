@@ -14,21 +14,18 @@ enum LiteCrateError: Error {
 
 public class LiteCrate {
   private var db: Database
-  public var delegate: (any LiteCrateDelegate)?
 
   public init(
     _ location: String,
-    delegate: (any LiteCrateDelegate)? = nil,
     @MigrationBuilder migrations: () -> Migration
   ) throws {
     db = try Database(location)
-    self.delegate = delegate
     try db.execute("PRAGMA FOREIGN_KEYS = TRUE")
     try runMigrations(migration: migrations())
   }
 
   private func runMigrations(migration: Migration) throws {
-    let proxy = TransactionProxy(db: db, delegate: delegate)
+    let proxy = TransactionProxy(db: db)
 
     // Don't call delegate transaction method.
     try proxy.db.beginTransaction()
@@ -37,7 +34,7 @@ public class LiteCrate {
     var currentVersion = try proxy.getCurrentSchemaVersion()
 
     if currentVersion == 0 {
-      try delegate?.migration(didInitializeIn: proxy)
+      // TODO: Setup.
       currentVersion = 1
     }
 
@@ -45,9 +42,7 @@ public class LiteCrate {
       let step = i + 1
       if step < currentVersion { continue }
       for action in migration.actions {
-        try delegate?.migration(willRun: action)
         try action.perform(in: proxy)
-        try delegate?.migrationActionDidRun(action)
       }
       currentVersion = Int64(step)
     }
@@ -61,15 +56,12 @@ public class LiteCrate {
 
   @discardableResult
   public func inTransaction<T>(block: (TransactionProxy) throws -> T) throws -> T {
-    let proxy = TransactionProxy(db: db, delegate: delegate)
+    let proxy = TransactionProxy(db: db)
 
     defer { proxy.isEnabled = false }
-    defer { delegate?.transactionDidEnd() }
     do {
       try proxy.db.beginTransaction()
-      try delegate?.transaction(didBeginIn: proxy)
       let returnValue = try block(proxy)
-      try delegate?.transaction(willCommitIn: proxy)
       try proxy.db.commit()
       proxy.isEnabled = false
       return returnValue

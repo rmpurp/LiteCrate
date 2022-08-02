@@ -10,16 +10,16 @@ import LiteCrateCore
 
 public final class TransactionProxy {
   public func fetch<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type, with primaryKey: U) throws -> T? {
-    try fetch(type, allWhere: "\(T.table.primaryKeyColumn) = ?", [primaryKey]).first
+    try fetch(type, where: "\(T.table.primaryKeyColumn) = ?", [primaryKey]).first
   }
 
   public func fetchIgnoringDelegate<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type,
                                                                                 with primaryKey: U) throws -> T?
   {
-    try fetchIgnoringDelegate(type, allWhere: "\(T.table.primaryKeyColumn) = ?", [primaryKey]).first
+    try fetchIgnoringDelegate(type, where: "\(T.table.primaryKeyColumn) = ?", [primaryKey]).first
   }
 
-  public func fetch<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
+  public func fetch<T: DatabaseCodable>(_: T.Type, where sqlWhereClause: String? = nil,
                                         _ values: [SqliteRepresentable?] = []) throws -> [T]
   {
     let sqlWhereClause = sqlWhereClause ?? "TRUE"
@@ -29,18 +29,12 @@ public final class TransactionProxy {
     var models = [T]()
     while cursor.step() {
       let model = try T(from: decoder)
-      if let delegate {
-        if try delegate.filter(model: model) {
-          models.append(model)
-        }
-      } else {
-        models.append(model)
-      }
+      models.append(model)
     }
     return models
   }
 
-  public func fetchIgnoringDelegate<T: DatabaseCodable>(_: T.Type, allWhere _: String? = nil,
+  public func fetchIgnoringDelegate<T: DatabaseCodable>(_: T.Type, where _: String? = nil,
                                                         _: [SqliteRepresentable?] = []) throws -> [T]
   {
     fatalError()
@@ -61,33 +55,15 @@ public final class TransactionProxy {
   }
 
   public func save<T: DatabaseCodable>(_ model: T) throws {
-    let model = try delegate?.proxy(self, willSave: model) ?? model
-    try saveIgnoringDelegate(model)
-  }
-
-  /// Save the given model, bypassing any processing by the delegate.
-  public func saveIgnoringDelegate<T: DatabaseCodable>(_ model: T) throws {
     let encoder = DatabaseEncoder(tableName: T.table.tableName)
     try model.encode(to: encoder)
     let (insertStatement, values) = encoder.insertStatement
     try db.execute(insertStatement, values)
   }
 
-  public func delete<T: DatabaseCodable>(_ model: T) throws {
-    if let model = try delegate?.proxy(self, willDelete: model) {
-      try saveIgnoringDelegate(model)
-    } else {
-      try deleteIgnoringDelegate(model)
-    }
-  }
-
-  public func deleteIgnoringDelegate<T: DatabaseCodable>(_: T) throws {
+  public func delete<T: DatabaseCodable>(_: T) throws {
     fatalError()
     #warning("fix me")
-//    try db.execute(
-//      "DELETE FROM \(T.exampleInstance.tableName) WHERE \(T.primaryKeyColumn) = ?",
-//      [model.primaryKeyValue]
-//    )
   }
 
   public func delete<T: DatabaseCodable, U: SqliteRepresentable>(_: T.Type, with primaryKey: U) throws {
@@ -95,29 +71,18 @@ public final class TransactionProxy {
     try delete(model)
   }
 
-  public func deleteIgnoringDelegate<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
+  public func deleteIgnoringDelegate<T: DatabaseCodable>(_: T.Type, where sqlWhereClause: String? = nil,
                                                          _ values: [SqliteRepresentable?] = []) throws
   {
     let sqlWhereClause = sqlWhereClause.flatMap { "WHERE \($0)" } ?? ""
     try db.execute("DELETE FROM \(T.table.tableName) \(sqlWhereClause)", values)
   }
 
-  public func delete<T: DatabaseCodable>(_: T.Type, allWhere sqlWhereClause: String? = nil,
-                                         _ values: [SqliteRepresentable?] = []) throws
-  {
-    let models = try fetch(T.self, allWhere: sqlWhereClause, values)
-    for model in models {
-      try delete(model)
-    }
-  }
-
   internal var db: Database
   internal var isEnabled = true
 
-  private var delegate: (any LiteCrateDelegate)?
-  internal init(db: Database, delegate: (any LiteCrateDelegate)?) {
+  internal init(db: Database) {
     self.db = db
-    self.delegate = delegate
   }
 }
 

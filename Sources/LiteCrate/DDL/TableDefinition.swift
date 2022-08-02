@@ -185,7 +185,6 @@ enum TableBuilder {
   }
 }
 
-
 // MARK: - Table
 
 /// Represents the columns and constraints of a Table, and provides convenient ways to access the
