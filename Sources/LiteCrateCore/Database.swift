@@ -52,6 +52,29 @@ public class Database {
     }
   }
 
+  private func bind(parameter: SqliteRepresentable?, at columnIndex: Int32, to statement: SqliteStatement) {
+    switch parameter?.asSqliteType {
+    case let .integer(val):
+      sqlite3_bind_int64(statement, columnIndex, val)
+    case let .real(val):
+      sqlite3_bind_double(statement, columnIndex, val)
+    case let .text(val):
+      sqlite3_bind_text(statement, columnIndex, val, Int32(val.lengthOfBytes(using: .utf8)), SQLITE_TRANSIENT)
+    case let .blob(val):
+      _ = val.withUnsafeBytes { bufferPointer in
+        sqlite3_bind_blob(
+          statement,
+          columnIndex,
+          bufferPointer.baseAddress,
+          Int32(bufferPointer.count),
+          SQLITE_TRANSIENT
+        )
+      }
+    case .none:
+      sqlite3_bind_null(statement, columnIndex)
+    }
+  }
+
   public func query(_ statement: String, _ parameters: [SqliteRepresentable?] = []) throws -> Cursor {
     guard !closed else { fatalError("Operating on a closed database.") }
     var ppStmt: SqliteStatement?
@@ -61,27 +84,28 @@ public class Database {
     }
 
     for (i, parameter) in parameters.enumerated() {
-      let columnIndex = Int32(i + 1)
-      switch parameter?.asSqliteType {
-      case let .integer(val):
-        sqlite3_bind_int64(ppStmt, columnIndex, val)
-      case let .real(val):
-        sqlite3_bind_double(ppStmt, columnIndex, val)
-      case let .text(val):
-        sqlite3_bind_text(ppStmt, columnIndex, val, Int32(val.lengthOfBytes(using: .utf8)), SQLITE_TRANSIENT)
-      case let .blob(val):
-        _ = val.withUnsafeBytes { bufferPointer in
-          sqlite3_bind_blob(
-            ppStmt,
-            columnIndex,
-            bufferPointer.baseAddress,
-            Int32(bufferPointer.count),
-            SQLITE_TRANSIENT
-          )
-        }
-      case .none:
-        sqlite3_bind_null(ppStmt, columnIndex)
+      bind(parameter: parameter, at: Int32(i + 1), to: ppStmt)
+    }
+
+    let cursor = Cursor(database: self, statement: ppStmt)
+    return cursor
+  }
+
+  public func query(_ statement: String, _ parameters: [String: SqliteRepresentable?]) throws -> Cursor {
+    guard !closed else { fatalError("Operating on a closed database.") }
+    var ppStmt: SqliteStatement?
+    let errorCode = sqlite3_prepare_v2(handle, statement, Int32(statement.lengthOfBytes(using: .utf8)), &ppStmt, nil)
+    guard errorCode == SQLITE_OK, let ppStmt else {
+      throw getError()
+    }
+
+    for (name, parameter) in parameters {
+      let columnIndex = sqlite3_bind_parameter_index(ppStmt, ":" + name)
+      if columnIndex == 0 {
+        // TODO: Don't make this so harsh...
+        fatalError("\(name) is not a parameter in \(statement)!")
       }
+      bind(parameter: parameter, at: columnIndex, to: ppStmt)
     }
 
     let cursor = Cursor(database: self, statement: ppStmt)
@@ -89,6 +113,12 @@ public class Database {
   }
 
   public func execute(_ statement: String, _ parameters: [SqliteRepresentable?] = []) throws {
+    guard !closed else { fatalError("Operating on a closed database.") }
+    let cursor = try query(statement, parameters)
+    _ = try cursor.stepWithError()
+  }
+
+  public func execute(_ statement: String, _ parameters: [String: SqliteRepresentable?]) throws {
     guard !closed else { fatalError("Operating on a closed database.") }
     let cursor = try query(statement, parameters)
     _ = try cursor.stepWithError()
