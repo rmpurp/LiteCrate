@@ -8,17 +8,7 @@
 import Foundation
 import LiteCrateCore
 
-/// Allowable types for columns.
-public enum SqliteType: String {
-  case integer = "INTEGER NOT NULL"
-  case real = "REAL NOT NULL"
-  case text = "TEXT NOT NULL"
-  case blob = "BLOB NOT NULL"
-  case nullableInteger = "INTEGER"
-  case nullableReal = "REAL"
-  case nullableText = "TEXT"
-  case nullableBlob = "BLOB"
-}
+// MARK: - Column Protocol
 
 /// This protocol represents a clause in a create-table statement, along with
 /// constraints that may be associated with taht column.
@@ -86,6 +76,8 @@ struct Column: ColumnProtocol {
   }
 }
 
+// MARK: - Primary Key Column
+
 /// A primary key column.
 struct PrimaryKeyColumn<C: ColumnProtocol>: ColumnProtocol {
   let baseColumn: C
@@ -119,6 +111,8 @@ struct PrimaryKeyColumn<C: ColumnProtocol>: ColumnProtocol {
     baseColumn.isForeignKeyColumn()
   }
 }
+
+// MARK: - Foreign Key Column
 
 /// A column that is a foreign key.
 struct ForeignKeyColumn<C: ColumnProtocol>: ColumnProtocol {
@@ -182,12 +176,17 @@ struct ForeignKeyColumn<C: ColumnProtocol>: ColumnProtocol {
   }
 }
 
+// MARK: - Table Result Builder
+
 @resultBuilder
 enum TableBuilder {
   static func buildBlock(_ components: any ColumnProtocol...) -> [any ColumnProtocol] {
     components
   }
 }
+
+
+// MARK: - Table
 
 /// Represents the columns and constraints of a Table, and provides convenient ways to access the
 /// table creation statement and interact with its foreign keys.
@@ -259,4 +258,18 @@ public struct Table {
     let placeholders = [String](repeating: "?", count: columns.count).joined(separator: ",")
     return "INSERT INTO \(tableName)(\(insertColumns)) VALUES (\(placeholders))"
   }
+}
+
+// MARK: - Sqlite Types
+
+/// Allowable types for columns.
+public enum SqliteType: String {
+  case integer = "INTEGER NOT NULL"
+  case real = "REAL NOT NULL"
+  case text = "TEXT NOT NULL"
+  case blob = "BLOB NOT NULL"
+  case nullableInteger = "INTEGER"
+  case nullableReal = "REAL"
+  case nullableText = "TEXT"
+  case nullableBlob = "BLOB"
 }
