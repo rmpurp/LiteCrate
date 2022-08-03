@@ -254,8 +254,11 @@ public struct Table {
       .map { "\($0.name)" }
       .joined(separator: ",")
 
-    let placeholders = [String](repeating: "?", count: columns.count).joined(separator: ",")
-    return "INSERT INTO \(tableName)(\(insertColumns)) VALUES (\(placeholders))"
+    let valueColumns = columns.lazy
+      .map { ":\($0.name)" }
+      .joined(separator: ",")
+    
+    return "INSERT INTO \(tableName)(\(insertColumns)) VALUES (\(valueColumns))"
   }
 }
 

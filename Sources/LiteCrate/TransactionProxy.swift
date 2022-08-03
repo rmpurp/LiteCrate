@@ -9,14 +9,10 @@ import Foundation
 import LiteCrateCore
 
 public final class TransactionProxy {
+  let nodeID = UUID() // TODO: Fix me.
+  
   public func fetch<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type, with primaryKey: U) throws -> T? {
     try fetch(type, where: "\(T.table.primaryKeyColumn) = ?", [primaryKey]).first
-  }
-
-  public func fetchIgnoringDelegate<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type,
-                                                                                with primaryKey: U) throws -> T?
-  {
-    try fetchIgnoringDelegate(type, where: "\(T.table.primaryKeyColumn) = ?", [primaryKey]).first
   }
 
   public func fetch<T: DatabaseCodable>(_: T.Type, where sqlWhereClause: String? = nil,
@@ -34,12 +30,6 @@ public final class TransactionProxy {
     return models
   }
 
-  public func fetchIgnoringDelegate<T: DatabaseCodable>(_: T.Type, where _: String? = nil,
-                                                        _: [SqliteRepresentable?] = []) throws -> [T]
-  {
-    fatalError()
-  }
-
   public func execute(_ sql: String, _ values: [SqliteRepresentable?] = []) throws {
     guard isEnabled else {
       fatalError("Do not use this proxy outside of the transaction closure")
@@ -55,27 +45,42 @@ public final class TransactionProxy {
   }
 
   public func save<T: DatabaseCodable>(_ model: T) throws {
-    let encoder = DatabaseEncoder(tableName: T.table.tableName)
+    let encoder = DatabaseEncoder()
     try model.encode(to: encoder)
-    let (insertStatement, values) = encoder.insertStatement
-    try db.execute(insertStatement, values)
+    try db.execute(T.table.insertStatement(), encoder.insertValues)
   }
 
-  public func delete<T: DatabaseCodable>(_: T) throws {
-    fatalError()
-    #warning("fix me")
+  public func save<T: ReplicatingModel>(_ model: T) throws {
+    guard var node = try fetch(Node.self, with: nodeID) else { return }
+    
+    
+    if var objectRecord = try fetch(ObjectRecord.self, with: model.id) {
+      // The model already exists; set us as the latest sequencer and bump the lamport.
+      objectRecord.lamport += 1
+      objectRecord.sequencer = nodeID
+      objectRecord.sequenceNumber = node.nextSequenceNumber
+      try save(objectRecord)
+    } else {
+      // The model does not exist (as far as we know), create a new one and bump the node's creation number.
+      let objectRecord = ObjectRecord(id: model.id, creator: node)
+      try save(objectRecord)
+      node.nextCreationNumber += 1
+    }
+    // Regardless, we bump the node's sequence number and save it.
+    node.nextSequenceNumber += 1
+    try save(node)
+    
+    let encoder = DatabaseEncoder()
+    try model.encode(to: encoder)
+    try db.execute(T.table.insertStatement(), encoder.insertValues)
+  }
+  
+  public func delete<T: DatabaseCodable>(_: T, where sqlWhereClause: String = "TRUE", _ values: [SqliteRepresentable?] = []) throws {
+    try db.execute("DELETE FROM \(T.table.tableName) WHERE \(sqlWhereClause)", values)
   }
 
   public func delete<T: DatabaseCodable, U: SqliteRepresentable>(_: T.Type, with primaryKey: U) throws {
-    guard let model = try fetch(T.self, with: primaryKey) else { return }
-    try delete(model)
-  }
-
-  public func deleteIgnoringDelegate<T: DatabaseCodable>(_: T.Type, where sqlWhereClause: String? = nil,
-                                                         _ values: [SqliteRepresentable?] = []) throws
-  {
-    let sqlWhereClause = sqlWhereClause.flatMap { "WHERE \($0)" } ?? ""
-    try db.execute("DELETE FROM \(T.table.tableName) \(sqlWhereClause)", values)
+    try db.execute("DELETE FROM \(T.table.tableName) WHERE \(T.table.primaryKeyColumn) = ?", [primaryKey])
   }
 
   internal var db: Database

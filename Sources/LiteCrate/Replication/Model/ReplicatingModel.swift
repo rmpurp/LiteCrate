@@ -7,6 +7,6 @@
 
 import Foundation
 
-public protocol ReplicatingModel: Codable {
+public protocol ReplicatingModel: Codable, Identifiable where ID == UUID {
   static var table: Table { get }
 }

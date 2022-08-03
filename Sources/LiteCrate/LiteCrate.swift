@@ -35,6 +35,8 @@ public class LiteCrate {
 
     if currentVersion == 0 {
       // TODO: Setup.
+      try proxy.execute(Node.table.createTableStatement())
+      try proxy.execute(ObjectRecord.table.createTableStatement())
       currentVersion = 1
     }
 

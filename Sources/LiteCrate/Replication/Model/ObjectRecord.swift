@@ -9,7 +9,7 @@ import Foundation
 
 /// A record of a replicating model object.
 
-struct ObjectRecord: Codable {
+struct ObjectRecord: DatabaseCodable {
   // The id of the record
   var id: UUID
   var creator: UUID
@@ -18,6 +18,15 @@ struct ObjectRecord: Codable {
   var sequenceNumber: Int64
   var lamport: Int64
 
+  init(id: UUID, creator: Node) {
+    self.id = id
+    self.creator = creator.id
+    self.creationNumber = creator.nextCreationNumber
+    self.sequencer = creator.id
+    self.sequenceNumber = creator.nextSequenceNumber
+    self.lamport = 0
+  }
+  
   static var table = Table("ObjectRecord") {
     Column(name: "id", type: .text).primaryKey()
     Column(name: "creator", type: .text)
