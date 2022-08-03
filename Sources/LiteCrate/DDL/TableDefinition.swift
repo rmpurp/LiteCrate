@@ -257,7 +257,7 @@ public struct Table {
     let valueColumns = columns.lazy
       .map { ":\($0.name)" }
       .joined(separator: ",")
-    
+
     return "INSERT INTO \(tableName)(\(insertColumns)) VALUES (\(valueColumns))"
   }
 }

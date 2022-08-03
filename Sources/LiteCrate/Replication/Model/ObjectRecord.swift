@@ -21,12 +21,12 @@ struct ObjectRecord: DatabaseCodable {
   init(id: UUID, creator: Node) {
     self.id = id
     self.creator = creator.id
-    self.creationNumber = creator.nextCreationNumber
-    self.sequencer = creator.id
-    self.sequenceNumber = creator.nextSequenceNumber
-    self.lamport = 0
+    creationNumber = creator.nextCreationNumber
+    sequencer = creator.id
+    sequenceNumber = creator.nextSequenceNumber
+    lamport = 0
   }
-  
+
   static var table = Table("ObjectRecord") {
     Column(name: "id", type: .text).primaryKey()
     Column(name: "creator", type: .text)

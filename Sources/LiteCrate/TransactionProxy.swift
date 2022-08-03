@@ -10,7 +10,7 @@ import LiteCrateCore
 
 public final class TransactionProxy {
   let nodeID = UUID() // TODO: Fix me.
-  
+
   public func fetch<T: DatabaseCodable, U: SqliteRepresentable>(_ type: T.Type, with primaryKey: U) throws -> T? {
     try fetch(type, where: "\(T.table.primaryKeyColumn) = ?", [primaryKey]).first
   }
@@ -52,8 +52,7 @@ public final class TransactionProxy {
 
   public func save<T: ReplicatingModel>(_ model: T) throws {
     guard var node = try fetch(Node.self, with: nodeID) else { return }
-    
-    
+
     if var objectRecord = try fetch(ObjectRecord.self, with: model.id) {
       // The model already exists; set us as the latest sequencer and bump the lamport.
       objectRecord.lamport += 1
@@ -69,13 +68,15 @@ public final class TransactionProxy {
     // Regardless, we bump the node's sequence number and save it.
     node.nextSequenceNumber += 1
     try save(node)
-    
+
     let encoder = DatabaseEncoder()
     try model.encode(to: encoder)
     try db.execute(T.table.insertStatement(), encoder.insertValues)
   }
-  
-  public func delete<T: DatabaseCodable>(_: T, where sqlWhereClause: String = "TRUE", _ values: [SqliteRepresentable?] = []) throws {
+
+  public func delete<T: DatabaseCodable>(_: T, where sqlWhereClause: String = "TRUE",
+                                         _ values: [SqliteRepresentable?] = []) throws
+  {
     try db.execute("DELETE FROM \(T.table.tableName) WHERE \(sqlWhereClause)", values)
   }
 
