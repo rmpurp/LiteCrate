@@ -26,8 +26,6 @@ public class LiteCrate {
 
   private func runMigrations(migration: Migration) throws {
     let proxy = TransactionProxy(db: db)
-
-    // Don't call delegate transaction method.
     try proxy.db.beginTransaction()
 
     // interpret the current version as "Next migration to run"
@@ -37,6 +35,12 @@ public class LiteCrate {
       // TODO: Setup.
       try proxy.execute(Node.table.createTableStatement())
       try proxy.execute(ObjectRecord.table.createTableStatement())
+      try proxy.execute(ForeignKeyField.table.createTableStatement())
+      try proxy.execute(EmptyRange.table.createTableStatement())
+      try proxy.execute("CREATE UNIQUE INDEX __FKObjectReferenceIndex__ ON ForeignKeyField (objectID, referenceID)")
+      try proxy.execute("CREATE INDEX __FKObjectIndex__ ON ForeignKeyField (objectID)")
+      try proxy.execute("CREATE INDEX __FKReferenceIndex__ ON ForeignKeyField (referenceID)")
+      // TODO: Indexes for empyty range, object record
       currentVersion = 1
     }
 
@@ -48,6 +52,7 @@ public class LiteCrate {
       }
       currentVersion = Int64(step)
     }
+
     try proxy.setCurrentSchemaVersion(version: currentVersion)
     try proxy.db.commit()
   }

@@ -15,7 +15,7 @@ struct EmptyRange: DatabaseCodable, Identifiable {
   var node: UUID
   /// The start of the range (inclusive).
   var start: Int64
-  /// The end ot the range (inclusive).
+  /// The end of the range (inclusive).
   var end: Int64
   /// The last node to modify this range.
   var sequencer: UUID
@@ -23,15 +23,26 @@ struct EmptyRange: DatabaseCodable, Identifiable {
   var sequenceNumber: Int64
 
   static var table = Table("EmptyRange") {
-    Column(name: "id", type: .text)
-    Column(name: "node", type: .text)
-    Column(name: "start", type: .integer)
-    Column(name: "end", type: .integer)
-    Column(name: "lastModifier", type: .text)
-    Column(name: "sequenceNumber", type: .integer)
+    Column(Self.CodingKeys.id, type: .text).primaryKey()
+    Column(Self.CodingKeys.node, type: .text)
+    Column(Self.CodingKeys.start, type: .integer)
+    Column(Self.CodingKeys.end, type: .integer)
+    Column(Self.CodingKeys.sequencer, type: .text)
+    Column(Self.CodingKeys.sequenceNumber, type: .integer)
+  }
+
+  init(objectRecord: ObjectRecord, sequencer: Node) {
+    id = UUID()
+    start = objectRecord.creationNumber
+    end = objectRecord.creationNumber
+    node = objectRecord.creator
+    self.sequencer = sequencer.id
+    sequenceNumber = sequencer.nextSequenceNumber
   }
 
   init(node: UUID, start: Int64, end: Int64, sequencer: UUID, sequenceNumber: Int64) {
+    precondition(start <= end)
+    // TODO: Make this a check
     id = UUID()
     self.start = start
     self.end = end

@@ -74,6 +74,33 @@ public final class TransactionProxy {
     try db.execute(T.table.insertStatement(), encoder.insertValues)
   }
 
+  public func delete<T: ReplicatingModel>(_ model: T) throws {
+    guard var node = try fetch(Node.self, with: nodeID),
+          let objectRecord = try fetch(ObjectRecord.self, with: model.id) else { return }
+
+    #warning("delete foreign keys first.")
+    let emptyRange = EmptyRange(objectRecord: objectRecord, sequencer: node)
+    node.nextSequenceNumber += 1
+    try save(node)
+    try mergeRangeAndDeleteMatchingModels(emptyRange)
+  }
+
+  private func mergeRangeAndDeleteMatchingModels(_ range: EmptyRange) throws {
+    let overlappingRanges = try fetch(EmptyRange.self, where: "node = ? AND start <= ? and end >= ?",
+                                      [range.end + 1, range.start - 1])
+    var range = range
+    for overlappingRange in overlappingRanges {
+      range.start = min(range.start, overlappingRange.start)
+      range.end = max(range.end, overlappingRange.end)
+      try delete(overlappingRange)
+    }
+
+    try execute("DELETE FROM ObjectRecord WHERE creator = ? AND ? <= creationNumber AND creationNumber >= ?",
+                [range.node, range.start, range.end])
+
+    try save(range)
+  }
+
   public func delete<T: DatabaseCodable>(_: T, where sqlWhereClause: String = "TRUE",
                                          _ values: [SqliteRepresentable?] = []) throws
   {

@@ -12,6 +12,7 @@ typealias SqliteDatabase = OpaquePointer
 
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
+#warning("Switch to just have #")
 public enum DatabaseError: Error, CustomDebugStringConvertible {
   public var debugDescription: String {
     switch self {
