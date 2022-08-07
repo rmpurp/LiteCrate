@@ -1,5 +1,6 @@
 @testable import LiteCrateCore
 import XCTest
+import sqlite3
 
 final class LiteCrateCoreTests: XCTestCase {
   func testBindQuestionMark() throws {

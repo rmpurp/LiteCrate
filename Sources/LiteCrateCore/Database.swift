@@ -54,7 +54,7 @@ public class Database {
   }
 
   private func bind(parameter: SqliteRepresentable?, at columnIndex: Int32, to statement: SqliteStatement) {
-    switch parameter?.asSqliteType {
+    switch parameter?.asSqliteValue {
     case let .integer(val):
       sqlite3_bind_int64(statement, columnIndex, val)
     case let .real(val):

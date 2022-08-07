@@ -12,7 +12,16 @@ class DatabaseEncoder: Encoder {
   var codingPath: [CodingKey] = []
   var userInfo: [CodingUserInfoKey: Any] = [:]
   private(set) var insertValues: [String: SqliteRepresentable?] = [:]
-  private(set) var primaryKeyValue: SqliteRepresentable!
+
+  func foreignKeyValues(table: Table) -> [String: SqliteValue?] {
+    var foreignKeys = [String: SqliteValue?]()
+    table.forEachForeignKey { key in
+      insertValues[key].flatMap {
+        foreignKeys[key] = $0?.asSqliteValue
+      }
+    }
+    return foreignKeys
+  }
 
   struct KEC<Key: CodingKey>: KeyedEncodingContainerProtocol {
     var codingPath: [CodingKey] = []

@@ -30,6 +30,26 @@ public final class TransactionProxy {
     return models
   }
 
+  // TODO: Reduce code duplication.
+  public func fetch<T: ReplicatingModel>(_: T.Type, where sqlWhereClause: String? = nil,
+                                         _ values: [SqliteRepresentable?] = []) throws -> [T]
+  {
+    let sqlWhereClause = sqlWhereClause ?? "TRUE"
+
+    let cursor = try db.query(T.table.selectStatement(where: sqlWhereClause), values)
+    let decoder = DatabaseDecoder(cursor: cursor)
+    var models = [T]()
+    while cursor.step() {
+      let model = try T(from: decoder)
+      models.append(model)
+    }
+    return models
+  }
+
+  public func fetch<T: ReplicatingModel, U: SqliteRepresentable>(_ type: T.Type, with primaryKey: U) throws -> T? {
+    try fetch(type, where: "\(T.table.primaryKeyColumn) = ?", [primaryKey]).first
+  }
+
   public func execute(_ sql: String, _ values: [SqliteRepresentable?] = []) throws {
     guard isEnabled else {
       fatalError("Do not use this proxy outside of the transaction closure")
@@ -50,17 +70,46 @@ public final class TransactionProxy {
     try db.execute(T.table.insertStatement(), encoder.insertValues)
   }
 
+  private func foreignKeyValueHasChanged<T: ReplicatingModel>(
+    oldModel: T,
+    newForeignKeyValues: [String: SqliteValue?]
+  ) throws -> Bool {
+    let encoder = DatabaseEncoder()
+    try oldModel.encode(to: encoder)
+    return encoder.foreignKeyValues(table: T.table) != newForeignKeyValues
+  }
+
   public func save<T: ReplicatingModel>(_ model: T) throws {
     guard var node = try fetch(Node.self, with: nodeID) else { return }
 
-    if var objectRecord = try fetch(ObjectRecord.self, with: model.id) {
+    let encoder = DatabaseEncoder()
+    try model.encode(to: encoder)
+
+    if var objectRecord = try fetch(ObjectRecord.self, with: model.id),
+       let oldModel = try fetch(T.self, with: model.id)
+    {
       // The model already exists; set us as the latest sequencer and bump the lamport.
       objectRecord.lamport += 1
       objectRecord.sequencer = nodeID
       objectRecord.sequenceNumber = node.nextSequenceNumber
+
+      if try foreignKeyValueHasChanged(
+        oldModel: oldModel,
+        newForeignKeyValues: encoder.foreignKeyValues(table: T.table)
+      ) {
+        // When a foreign key changes, this is considered a rebirth of the object. The reason behind this is changing a
+        // foreign key typically signifies moving the object to a different category, etc., so if it gets concurrently
+        // deleted on another node, the moved object does not get deleted.
+        objectRecord.creator = nodeID
+        objectRecord.creationNumber = node.nextCreationNumber
+        node.nextCreationNumber += 1
+        // TODO: Should this need to delete foreign key dependencies? My guess is no, but I need to think about the
+        // implications. Actually, this should probably rebirth the dependencies, as well. Yikes...
+      }
+
       try save(objectRecord)
     } else {
-      // The model does not exist (as far as we know), create a new one and bump the node's creation number.
+      // The model does not exist or needs to be recreated; create a new one and bump the node's creation number.
       let objectRecord = ObjectRecord(id: model.id, creator: node)
       try save(objectRecord)
       node.nextCreationNumber += 1
@@ -69,16 +118,23 @@ public final class TransactionProxy {
     node.nextSequenceNumber += 1
     try save(node)
 
-    let encoder = DatabaseEncoder()
-    try model.encode(to: encoder)
     try db.execute(T.table.insertStatement(), encoder.insertValues)
   }
 
   public func delete<T: ReplicatingModel>(_ model: T) throws {
-    guard var node = try fetch(Node.self, with: nodeID),
-          let objectRecord = try fetch(ObjectRecord.self, with: model.id) else { return }
+    guard let objectRecord = try fetch(ObjectRecord.self, with: model.id) else { return }
+    try delete(objectRecord: objectRecord)
+  }
 
-    #warning("delete foreign keys first.")
+  private func delete(objectRecord: ObjectRecord) throws {
+    guard var node = try fetch(Node.self, with: nodeID) else { return }
+
+    for fkField in try fetch(ForeignKeyField.self, where: "referenceID = ?", [objectRecord.id]) {
+      guard fkField.objectID != fkField.referenceID,
+            let objectRecord = try fetch(ObjectRecord.self, with: fkField.objectID) else { continue }
+      try delete(objectRecord: objectRecord)
+    }
+
     let emptyRange = EmptyRange(objectRecord: objectRecord, sequencer: node)
     node.nextSequenceNumber += 1
     try save(node)
