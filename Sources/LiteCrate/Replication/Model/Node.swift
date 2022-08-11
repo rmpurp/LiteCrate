@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Node: DatabaseCodable, Identifiable {
+struct Node: ReplicatingModel, Identifiable {
   var id: UUID
   var nextSequenceNumber: Int64
   var nextCreationNumber: Int64

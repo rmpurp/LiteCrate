@@ -16,6 +16,7 @@ struct ObjectRecord: DatabaseCodable {
   var creationNumber: Int64
   var sequencer: UUID
   var sequenceNumber: Int64
+  var schemaVersion: Int64
   var lamport: Int64
 
   init(id: UUID, creator: Node) {
@@ -24,6 +25,7 @@ struct ObjectRecord: DatabaseCodable {
     creationNumber = creator.nextCreationNumber
     sequencer = creator.id
     sequenceNumber = creator.nextSequenceNumber
+    schemaVersion = 0
     lamport = 0
   }
 
@@ -33,6 +35,7 @@ struct ObjectRecord: DatabaseCodable {
     Column(name: "creationNumber", type: .integer)
     Column(name: "sequencer", type: .text)
     Column(name: "sequenceNumber", type: .integer)
+    Column(name: "schemaVersion", type: .integer)
     Column(name: "lamport", type: .integer)
   }
 }
