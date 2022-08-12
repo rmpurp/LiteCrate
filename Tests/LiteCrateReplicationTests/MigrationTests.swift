@@ -23,14 +23,29 @@ final class MigrationTests: XCTestCase {
 //  }
 
   func test() {
-    let table = Table("Person") {
-      Column(name: "id", type: .text).primaryKey()
-      Column(name: "name", type: .text)
-      Column(name: "age", type: .nullableText)
-      Column(name: "parent", type: .nullableText).foreignKey(foreignTable: "Person")
+    let schema = EntitySchema(name: "Person")
+        .withProperty("name", type: .text, version: 1)
+        .withProperty("age", type: .nullableInteger, version: 1)
+        .withRelationship("dog", reference: "Dog", version: 1)
+        .withProperty("age2", type: .blob, version: 2)
+        .withRelationship("dog2", reference: "Dog", version: 2)
+
+    for a in schema.statementsToRun(currentVersion: 0) {
+      print(a)
     }
-    print(table.createTableStatement())
-    print(table.selectStatement())
-    print(table.insertStatement())
+
+    for b in schema.statementsToRun(currentVersion: 1) {
+      print(b)
+    }
+
+//    let table = Table("Person") {
+//      Column(name: "id", type: .text).primaryKey()
+//      Column(name: "name", type: .text)
+//      Column(name: "age", type: .nullableText)
+//      Column(name: "parent", type: .nullableText).foreignKey(foreignTable: "Person")
+//    }
+//    print(table.createTableStatement())
+//    print(table.selectStatement())
+//    print(table.insertStatement())
   }
 }
