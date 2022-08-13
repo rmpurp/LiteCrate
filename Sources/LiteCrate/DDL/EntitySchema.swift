@@ -50,6 +50,17 @@ public struct EntitySchema: Codable {
     usedNames.insert(name)
   }
   
+  enum CodingKeys: CodingKey {
+    case name
+    case versions
+  }
+  
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(self.name, forKey: .name)
+    try container.encode(self.versions, forKey: .versions)
+  }
+  
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
     self.name = try container.decode(String.self, forKey: .name)
@@ -64,7 +75,6 @@ public struct EntitySchema: Codable {
         try insertAndCheck(name: relationship.name)
       }
     }
-    self.usedNames = try container.decode(Set<String>.self, forKey: .usedNames)
   }
   
   /// For the first version, start at 1.
@@ -75,11 +85,10 @@ public struct EntitySchema: Codable {
     } catch {
       preconditionFailure()
     }
-
+    
     schema.versions[version, default: Version()].properties.append(SchemaProperty(name: propertyName, type: type, version: version))
     return schema
   }
-  
   
   /// Ignored if version is not the first version. May be changed in the future.
   /// For the first version, start at 1.
@@ -90,9 +99,9 @@ public struct EntitySchema: Codable {
     } catch {
       preconditionFailure()
     }
-
+    
     schema.versions[version, default: Version()].relationships.append(SchemaRelationship(name: relationshipName, reference: reference, version: version))
-
+    
     return schema
   }
   
@@ -122,6 +131,10 @@ public struct EntitySchema: Codable {
     }
   }
   
+  func matchesSchema(_ entity: ReplicatingEntity) -> Bool {
+    Set(entity.fields.keys) == self.usedNames
+  }
+  
   func statementsToRun(currentVersion: Int64 = 0) -> [String] {
     var statements = [String]()
     let sortedVersions = versions.sorted { item0, item1 in
@@ -137,5 +150,16 @@ public struct EntitySchema: Codable {
     }
     
     return statements
+  }
+  
+  func insertStatement() -> String {
+    let columns = versions.values.flatMap { version in
+      version.properties.map { $0.name } + version.relationships.map { $0.name }
+    }
+    
+    let insertColumns = columns.joined(separator: ",")
+    let valueColumns = columns.map{ ":\($0)" }.joined(separator: ",")
+    
+    return "INSERT INTO \(name)(\(insertColumns)) VALUES (\(valueColumns))"
   }
 }
