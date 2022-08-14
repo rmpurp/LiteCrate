@@ -12,6 +12,40 @@ import LiteCrateCore
 fileprivate struct SchemaProperty {
   var name: String
   var type: ExtendedSqliteType
+  
+  enum Subcolumn: String, CaseIterable {
+    case lamport
+    case sequencer
+    case sequenceNumber
+    
+    var type: ExtendedSqliteType {
+      switch self {
+      case .lamport: return .integer
+      case .sequencer: return .uuid
+      case .sequenceNumber: return .integer
+      }
+    }
+    
+    func columnName(from baseName: String) -> String {
+      "\(baseName)__\(rawValue)"
+    }
+  }
+  
+  func columnDefinitions() -> [String] {
+    var definitions = [String]()
+    definitions.append("\(name) \(type.sqliteType.rawValue)")
+    for subcolumn in Subcolumn.allCases {
+      definitions.append("\(subcolumn.columnName(from: name)) \(subcolumn.type.sqliteType.rawValue)")
+    }
+    return definitions
+  }
+  
+  func insertColumns() -> [String] {
+    var columns = [String]()
+    columns.append("\(name)")
+    columns.append(contentsOf: Subcolumn.allCases.map {$0.columnName(from: name)})
+    return columns
+  }
 }
 
 /// The definition of an Entity.
@@ -58,13 +92,9 @@ public struct EntitySchema {
   }
   
   public func createTableStatement() -> String {
-    var columnDefinitions = [String]()
+    var columnDefinitions = properties.values.flatMap { $0.columnDefinitions() }
     var columnConstraints = [String]()
     columnDefinitions.append("id TEXT NOT NULL PRIMARY KEY")
-    
-    for property in properties.values {
-      columnDefinitions.append("\(property.name) \(property.type.sqliteType.rawValue)")
-    }
     
     for (column, reference) in relationships {
       columnConstraints.append("FOREIGN KEY (\(column)) REFERENCES \(reference)(id)")
@@ -74,7 +104,7 @@ public struct EntitySchema {
   }
   
   func insertStatement() -> String {
-    let columns = properties.values.map(\.name) + ["id"]
+    let columns = properties.values.flatMap { $0.insertColumns () } + ["id"]
     let insertColumns = columns.joined(separator: ",")
     let valueColumns = columns.map{ ":\($0)" }.joined(separator: ",")
     
