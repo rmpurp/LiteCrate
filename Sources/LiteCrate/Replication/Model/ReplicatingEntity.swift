@@ -10,14 +10,14 @@ import LiteCrateCore
 
 public struct ReplicatingEntity {
   public let entityType: String
-  public private(set) var fields: [String: SqliteValue?]
+  public private(set) var fields: [String: ExtendedSqliteValue?]
 
   public init(entityType: String) {
     self.entityType = entityType
     self.fields = [:]
   }
 
-  public subscript(_ key: String) -> SqliteValue? {
+  public subscript(_ key: String) -> ExtendedSqliteValue? {
     get {
       return fields[key]!
     }

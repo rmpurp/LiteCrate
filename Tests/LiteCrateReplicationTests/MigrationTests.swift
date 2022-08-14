@@ -9,49 +9,30 @@ import Foundation
 import XCTest
 
 @testable import LiteCrate
+@testable import LiteCrateCore
 
 final class MigrationTests: XCTestCase {
-//  func testMigration() throws {
-//    let controller = try ReplicationController(location: ":memory:", nodeID: UUID()) {
-//      MigrationGroup {
-//        CreateReplicatingTable(Employee.self)
-//        CreateReplicatingTable(Boss.self)
-//      }
-//    }
-//
-//    XCTAssertEqual(controller.tables.count, 2)
-//  }
-
-  func test() {
+  func testEntitySchema() throws {
     let schemaVersion1 = EntitySchema(name: "Person")
-        .withProperty("name", type: .text, version: 1)
-        .withProperty("age", type: .nullableInteger, version: 1)
-        .withRelationship("dog", reference: "Dog", version: 1)
-    
-    let schema = schemaVersion1
-        .withProperty("age2", type: .blob, version: 2)
-        .withRelationship("dog2", reference: "Dog", version: 2)
+        .withProperty("name", type: .nullableText)
+        .withProperty("age", type: .integer)
+        .withRelationship("dog", reference: "Dog")
 
-    for a in schema.statementsToRun(currentVersion: 0) {
-      print(a)
-    }
+    let database = try Database(":memory:")
+    try database.execute("CREATE TABLE Dog (id TEXT NOT NULL PRIMARY KEY)")
+    try database.execute("INSERT INTO Dog VALUES ('fido')")
+    print(schemaVersion1.createTableStatement())
 
-    for b in schema.statementsToRun(currentVersion: 1) {
-      print(b)
-    }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = .prettyPrinted
-    print(String(data: try! encoder.encode(schema), encoding: .utf8)!)
-    print(schema.insertStatement())
-  
-//    let table = Table("Person") {
-//      Column(name: "id", type: .text).primaryKey()
-//      Column(name: "name", type: .text)
-//      Column(name: "age", type: .nullableText)
-//      Column(name: "parent", type: .nullableText).foreignKey(foreignTable: "Person")
-//    }
-//    print(table.createTableStatement())
-//    print(table.selectStatement())
-//    print(table.insertStatement())
+    try database.execute(schemaVersion1.createTableStatement())
+    try database.execute(schemaVersion1.insertStatement(), ["id": "abc123", "name": nil, "age": 17, "dog": "fido"])
+    let cursor = try database.query(schemaVersion1.selectStatement())
+    XCTAssertTrue(cursor.step())
+    XCTAssertEqual(cursor.string(for: cursor.columnToIndex["id"]!), "abc123")
+    XCTAssertTrue(cursor.isNull(for: cursor.columnToIndex["name"]!))
+    XCTAssertEqual(cursor.int(for: cursor.columnToIndex["age"]!), 17)
+    XCTAssertEqual(cursor.string(for: cursor.columnToIndex["dog"]!), "fido")
+
+    print(schemaVersion1.insertStatement())
+    print(schemaVersion1.selectStatement())
   }
 }

@@ -262,16 +262,3 @@ public struct Table {
   }
 }
 
-// MARK: - Sqlite Types
-
-/// Allowable types for columns.
-public enum SqliteType: String, Codable {
-  case integer = "INTEGER NOT NULL"
-  case real = "REAL NOT NULL"
-  case text = "TEXT NOT NULL"
-  case blob = "BLOB NOT NULL"
-  case nullableInteger = "INTEGER"
-  case nullableReal = "REAL"
-  case nullableText = "TEXT"
-  case nullableBlob = "BLOB"
-}
