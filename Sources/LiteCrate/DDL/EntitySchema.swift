@@ -9,11 +9,11 @@ import Foundation
 import LiteCrateCore
 
 /// A property, corresponding to a column that is not a foreign key.
-fileprivate struct SchemaProperty {
+fileprivate struct PropertySchema {
   var name: String
   var type: ExtendedSqliteType
   
-  enum Subcolumn: String, CaseIterable {
+  enum SubcolumnSchema: String, CaseIterable {
     case lamport
     case sequencer
     case sequenceNumber
@@ -34,7 +34,7 @@ fileprivate struct SchemaProperty {
   func columnDefinitions() -> [String] {
     var definitions = [String]()
     definitions.append("\(name) \(type.sqliteType.rawValue)")
-    for subcolumn in Subcolumn.allCases {
+    for subcolumn in SubcolumnSchema.allCases {
       definitions.append("\(subcolumn.columnName(from: name)) \(subcolumn.type.sqliteType.rawValue)")
     }
     return definitions
@@ -43,7 +43,7 @@ fileprivate struct SchemaProperty {
   func insertColumns() -> [String] {
     var columns = [String]()
     columns.append("\(name)")
-    columns.append(contentsOf: Subcolumn.allCases.map {$0.columnName(from: name)})
+    columns.append(contentsOf: SubcolumnSchema.allCases.map {$0.columnName(from: name)})
     return columns
   }
 }
@@ -55,7 +55,7 @@ public struct EntitySchema {
   }
   
   public private(set) var name: String
-  fileprivate var properties: [String: SchemaProperty] = [:]
+  fileprivate var properties: [String: PropertySchema] = [:]
   fileprivate var relationships: [String: String] = [:]
   private var usedNames: Set<String>
   
@@ -73,7 +73,7 @@ public struct EntitySchema {
       preconditionFailure()
     }
       
-    schema.properties[propertyName] = SchemaProperty(name: propertyName, type: type)
+    schema.properties[propertyName] = PropertySchema(name: propertyName, type: type)
     return schema
   }
   
@@ -86,7 +86,7 @@ public struct EntitySchema {
     } catch {
       preconditionFailure()
     }
-    schema.properties[relationshipName] = SchemaProperty(name: relationshipName, type: nullable ? .nullableUUID : .uuid)
+    schema.properties[relationshipName] = PropertySchema(name: relationshipName, type: nullable ? .nullableUUID : .uuid)
     schema.relationships[relationshipName] = reference
     return schema
   }
@@ -111,10 +111,16 @@ public struct EntitySchema {
     return "INSERT INTO \(name)(\(insertColumns)) VALUES (\(valueColumns))"
   }
   
-  func selectStatement(predicate: String = "TRUE") -> String {
+  func completeSelectStatement(predicate: String = "TRUE") -> String {
+    // TODO: Fix me.
+    let columns = (properties.values.map(\.name) + ["id"]).map {"\($0) AS \($0)"}.joined(separator: ",")
+
+    return "SELECT \(columns) FROM \(name) WHERE \(predicate)"
+  }
+  
+  func fieldsOnlySelectStatement(predicate: String = "TRUE") -> String {
     let columns = (properties.values.map(\.name) + ["id"]).map {"\($0) AS \($0)"}.joined(separator: ",")
     
-
     return "SELECT \(columns) FROM \(name) WHERE \(predicate)"
   }
 }

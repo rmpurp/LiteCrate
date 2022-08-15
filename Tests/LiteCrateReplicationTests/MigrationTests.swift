@@ -41,13 +41,13 @@ final class MigrationTests: XCTestCase {
       "dog__sequenceNumber": 5,
       "dog__lamport": 6,
     ])
-    let cursor = try database.query(schemaVersion1.selectStatement())
+    let cursor = try database.query(schemaVersion1.completeSelectStatement())
     XCTAssertTrue(cursor.step())
     XCTAssertEqual(cursor.string(for: cursor.columnToIndex["id"]!), "abc123")
     XCTAssertTrue(cursor.isNull(for: cursor.columnToIndex["name"]!))
     XCTAssertEqual(cursor.int(for: cursor.columnToIndex["age"]!), 17)
     XCTAssertEqual(cursor.string(for: cursor.columnToIndex["dog"]!), "fido")
 
-    print(schemaVersion1.selectStatement())
+    print(schemaVersion1.completeSelectStatement())
   }
 }

@@ -75,7 +75,15 @@ public final class TransactionProxy {
     }
     return try db.query(sql, values)
   }
-
+  
+  func save(_ entity: ReplicatingEntity) throws {
+    guard let schema = liteCrate.schemas[entity.entityType] else {
+      fatalError()
+    }
+    
+    try db.execute(schema.insertStatement(), entity.fields)
+  }
+  
   public func save<T: DatabaseCodable>(_ model: T) throws {
     let encoder = DatabaseEncoder()
     try model.encode(to: encoder)
@@ -199,6 +207,8 @@ public final class TransactionProxy {
     try db.execute("DELETE FROM \(T.table.tableName) WHERE \(T.table.primaryKeyColumn) = ?", [primaryKey])
   }
 
+#warning("Fix me")
+  internal var liteCrate: LiteCrate!
   internal var db: Database
   internal var isEnabled = true
 
