@@ -31,7 +31,7 @@ public class LiteCrate {
   }
 
   private func runMigrations(migration: Migration) throws {
-    let proxy = TransactionProxy(db: db)
+    let proxy = TransactionProxy(liteCrate: self, database: db)
     try proxy.db.beginTransaction()
 
     // interpret the current version as "Next migration to run"
@@ -58,10 +58,6 @@ public class LiteCrate {
       """, [nodeID])
 
       try proxy.execute("""
-          INSERT INTO Field VALUES (?1, 'Node', ?1, 0, 0, 'id', ?1), (?1, 'Node', ?1, 0, 0, 'nextSequenceNumber', 0)
-      """, [nodeID])
-
-      try proxy.execute("""
       CREATE TABLE DeletedRange (
           parentObject TEXT REFERENCES ObjectRecord ON DELETE CASCADE,
           sequencer TEXT NOT NULL,
@@ -78,67 +74,6 @@ public class LiteCrate {
           parentObject TEXT NOT NULL
       )
       """)
-
-      try proxy.execute("""
-      CREATE TABLE Field (
-          objectID TEXT NOT NULL,
-          objectType TEXT NOT NULL,
-          sequencer TEXT NOT NULL,
-          sequenceNumber INTEGER NOT NULL,
-          lamport INTEGER NOT NULL,
-          key TEXT NOT NULL,
-          value BLOB,
-          PRIMARY KEY (objectID, key),
-          FOREIGN KEY (objectID, objectType) REFERENCES ObjectRecord(id, type)
-      )
-      """)
-      
-      try proxy.execute("""
-      CREATE VIEW FieldInput AS
-          SELECT
-              objectID AS objectID,
-              objectType AS objectType,
-              sequencer AS sequencer,
-              sequenceNumber AS sequenceNumber,
-              lamport AS lamport,
-              key AS key,
-              value AS value
-          FROM Field;
-      """)
-
-      try proxy.execute("""
-      CREATE TRIGGER InsertFieldTrigger INSTEAD OF INSERT ON FieldInput BEGIN
-          SELECT RAISE(IGNORE) FROM Field
-                  WHERE NEW.lamport IS NULL AND objectID = NEW.objectID AND key = NEW.key AND value = NEW.value;
-
-          SELECT RAISE(IGNORE) FROM Field
-                  WHERE objectID = NEW.objectID AND key = NEW.key AND (
-                      lamport > NEW.lamport
-                      OR lamport = NEW.lamport AND value >= NEW.value
-                  );
-                        
-          INSERT OR REPLACE INTO Field VALUES (
-              NEW.objectID,
-              NEW.objectType,
-              NEW.sequencer,
-              NEW.sequenceNumber,
-              COALESCE(NEW.lamport, 1 + (SELECT lamport FROM Field WHERE objectID = NEW.objectID AND key = NEW.key), 0),
-              NEW.key,
-              NEW.value
-          );
-          --ON CONFLICT DO UPDATE SET
-          --    lamport = max(lamport, excluded.lamport),
-          --    value = iif(lamport = excluded.lamport,
-          --            max(value, excluded.value),
-          --                iff(lamport < excluded.lamport,
-          --                    excluded.value,
-          --                    value));
-      END
-      """)
-      
-//      try proxy.execute("CREATE UNIQUE INDEX __FKObjectReferenceIndex__ ON ForeignKeyField (objectID, referenceID)")
-//      try proxy.execute("CREATE INDEX __FKObjectIndex__ ON ForeignKeyField (objectID)")
-//      try proxy.execute("CREATE INDEX __FKReferenceIndex__ ON ForeignKeyField (referenceID)")
       currentVersion = 1
     }
 
@@ -161,7 +96,7 @@ public class LiteCrate {
 
   @discardableResult
   public func inTransaction<T>(block: (TransactionProxy) throws -> T) throws -> T {
-    let proxy = TransactionProxy(db: db)
+    let proxy = TransactionProxy(liteCrate: self, database: db)
 
     defer { proxy.isEnabled = false }
     do {

@@ -77,12 +77,62 @@ public final class TransactionProxy {
   }
   
   func save(_ entity: ReplicatingEntity) throws {
+    guard isEnabled else {
+      fatalError("Do not use this proxy outside of the transaction closure")
+    }
+
     guard let schema = liteCrate.schemas[entity.entityType] else {
       fatalError()
     }
     
-    try db.execute(schema.insertStatement(), entity.fields)
+    if var existingEntityWithMetadata = try fetchWithMetadata(entity.entityType, with: entity.id) {
+      existingEntityWithMetadata.merge(entity, sequencer: nodeID, sequenceNumber: TEMPsequenceNumber)
+      TEMPsequenceNumber += 1
+      try db.execute(schema.insertStatement(), existingEntityWithMetadata.insertValues())
+    } else {
+      let entityWithMetadata = ReplicatingEntityWithMetadata(
+          newReplicatingEntity: entity, creator: nodeID, sequenceNumber: TEMPsequenceNumber)
+      TEMPsequenceNumber += 1
+      try db.execute(schema.insertStatement(), entityWithMetadata.insertValues())
+    }
   }
+  
+  public func fetch(_ entityType: String, with id: UUID) throws -> ReplicatingEntity? {
+    return try fetch(entityType, predicate: "id = ?", [id]).first
+  }
+  
+  private func fetchWithMetadata(_ entityType: String, with id: UUID) throws -> ReplicatingEntityWithMetadata? {
+    return try fetchWithMetadata(entityType, predicate: "id = ?", [id]).first
+  }
+  
+  public func fetch(_ entityType: String, predicate: String = "TRUE", _ values: [SqliteRepresentable?] = []) throws -> [ReplicatingEntity] {
+    guard isEnabled else {
+      fatalError("Do not use this proxy outside of the transaction closure")
+    }
+
+    guard let schema = liteCrate.schemas[entityType] else { fatalError() }
+    let cursor = try db.query(schema.fieldsOnlySelectStatement(predicate: predicate), values)
+    var returnValue = [ReplicatingEntity]()
+    while cursor.step() {
+      returnValue.append(schema.entity(cursor: cursor))
+    }
+    return returnValue
+  }
+
+  func fetchWithMetadata(_ entityType: String, predicate: String = "TRUE", _ values: [SqliteRepresentable?] = []) throws -> [ReplicatingEntityWithMetadata] {
+    guard isEnabled else {
+      fatalError("Do not use this proxy outside of the transaction closure")
+    }
+
+    guard let schema = liteCrate.schemas[entityType] else { fatalError() }
+    let cursor = try db.query(schema.fieldsOnlySelectStatement(predicate: predicate))
+    var returnValue = [ReplicatingEntityWithMetadata]()
+    while cursor.step() {
+      returnValue.append(schema.entityWithMetadata(cursor: cursor))
+    }
+    return returnValue
+  }
+  // MARK: - Old stuff below
   
   public func save<T: DatabaseCodable>(_ model: T) throws {
     let encoder = DatabaseEncoder()
@@ -207,13 +257,15 @@ public final class TransactionProxy {
     try db.execute("DELETE FROM \(T.table.tableName) WHERE \(T.table.primaryKeyColumn) = ?", [primaryKey])
   }
 
-#warning("Fix me")
-  internal var liteCrate: LiteCrate!
+  #warning(" persist sequence number, node")
+  internal var liteCrate: LiteCrate
+  internal var TEMPsequenceNumber: Int64 = 0
   internal var db: Database
   internal var isEnabled = true
 
-  internal init(db: Database) {
-    self.db = db
+  internal init(liteCrate: LiteCrate, database: Database) {
+    self.liteCrate = liteCrate
+    self.db = database
   }
 }
 

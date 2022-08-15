@@ -65,7 +65,7 @@ struct ReplicatingEntityWithMetadata {
     insertDict["id"] = id
     for (key, field) in fields {
       insertDict[key] = field.value
-      // TODO: make this consistent
+      // TODO: make this unified with EntitySchema
       insertDict["\(key)__lamport"] = field.lamport
       insertDict["\(key)__sequencer"] = field.sequencer
       insertDict["\(key)__sequenceNumber"] = field.sequenceNumber
