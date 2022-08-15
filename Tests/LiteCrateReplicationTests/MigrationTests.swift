@@ -21,11 +21,8 @@ final class MigrationTests: XCTestCase {
     let database = try Database(":memory:")
     try database.execute("CREATE TABLE Dog (id TEXT NOT NULL PRIMARY KEY)")
     try database.execute("INSERT INTO Dog VALUES ('fido')")
-    print(schemaVersion1.createTableStatement())
     
     try database.execute(schemaVersion1.createTableStatement())
-    print(schemaVersion1.insertStatement())
-    
     try database.execute(schemaVersion1.insertStatement(), [
       "id": "abc123",
       "name": nil,
@@ -47,8 +44,6 @@ final class MigrationTests: XCTestCase {
     XCTAssertTrue(cursor.isNull(for: cursor.columnToIndex["name"]!))
     XCTAssertEqual(cursor.int(for: cursor.columnToIndex["age"]!), 17)
     XCTAssertEqual(cursor.string(for: cursor.columnToIndex["dog"]!), "fido")
-    
-    print(schemaVersion1.completeSelectStatement())
   }
   
   func testCRUD() throws {
@@ -66,9 +61,6 @@ final class MigrationTests: XCTestCase {
     try liteCrate.inTransaction { db in
       try db.execute(schema.createTableStatement())
       try db.save(entity)
-    }
-    
-    try liteCrate.inTransaction { db in
       let fetched = try db.fetch("Person", with: entity.id)!
       guard case let .text(name) = fetched.fields["name"] else { XCTFail(); return }
       guard case let .integer(age) = fetched.fields["age"] else { XCTFail(); return }
@@ -76,7 +68,5 @@ final class MigrationTests: XCTestCase {
       XCTAssertEqual(age, 4)
       XCTAssertEqual(fetched.id, entity.id)
     }
-    
-    
   }
 }

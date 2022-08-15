@@ -74,12 +74,6 @@ public enum ExtendedSqliteValue: Equatable, SqliteRepresentable {
     }
   }
   
-//  init?(cursor: Cursor, columnName: String, type: ExtendedSqliteType) {
-//    switch type {
-//      if cursor.
-//    }
-//  }
-//  
   case integer(val: Int64)
   case real(val: Double)
   case text(val: String)

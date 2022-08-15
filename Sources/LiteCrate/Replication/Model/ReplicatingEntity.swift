@@ -21,15 +21,18 @@ enum FieldType {
 }
 
 struct ReplicatingEntityWithMetadata {
+  let entityType: String
   var fields: [String: CompleteFieldData]
   let id: UUID
   
-  init(id: UUID, fields: [String: CompleteFieldData]) {
+  init(entityType: String, id: UUID, fields: [String: CompleteFieldData]) {
+    self.entityType = entityType
     self.fields = fields
     self.id = id
   }
   
   init(newReplicatingEntity: ReplicatingEntity, creator: UUID, sequenceNumber: Int64) {
+    entityType = newReplicatingEntity.entityType
     fields = [:]
     id = newReplicatingEntity.id
     for (key, value) in newReplicatingEntity.fields {
@@ -38,6 +41,7 @@ struct ReplicatingEntityWithMetadata {
   }
   
   mutating func merge(_ entity: ReplicatingEntity, sequencer: UUID, sequenceNumber: Int64) {
+    precondition(entityType == entity.entityType)
     for (key, value) in entity.fields {
       guard var existing = fields[key] else { fatalError("Incompatible schema!") }
       if existing.value != value {
@@ -50,6 +54,8 @@ struct ReplicatingEntityWithMetadata {
   }
   
   mutating func merge(_ entity: ReplicatingEntityWithMetadata) {
+    precondition(entityType == entity.entityType)
+
     for (key, otherField) in entity.fields {
       guard let existing = fields[key] else { fatalError("Incompatible schema!") }
       if existing.lamport < otherField.lamport

@@ -126,65 +126,69 @@ public struct EntitySchema {
 }
 
 extension EntitySchema {
-  func fetch(cursor: Cursor, _ name: String, type: ExtendedSqliteType) -> ExtendedSqliteValue? {
+  // TODO: Move to extension on Cursor
+}
+
+extension Cursor {
+  func fetch(name: String, type: ExtendedSqliteType) -> ExtendedSqliteValue? {
     switch type {
     case .nullableInteger:
-      guard !cursor.isNull(for: name) else { return nil }
-        fallthrough
+      guard !isNull(for: name) else { return nil }
+      fallthrough
     case .integer:
-      return .integer(val: cursor.int(for: name))
+      return .integer(val: int(for: name))
     case .nullableReal:
-      guard !cursor.isNull(for: name) else { return nil }
+      guard !isNull(for: name) else { return nil }
       fallthrough
     case .real:
-      return .real(val: cursor.double(for: name))
+      return .real(val: double(for: name))
     case .nullableText:
-      guard !cursor.isNull(for: name) else { return nil }
+      guard !isNull(for: name) else { return nil }
       fallthrough
     case .text:
-      return .text(val: cursor.string(for: name))
+      return .text(val: string(for: name))
     case .nullableBlob:
-      guard !cursor.isNull(for: name) else { return nil }
+      guard !isNull(for: name) else { return nil }
       fallthrough
     case .blob:
-      return .blob(val: cursor.data(for: name))
+      return .blob(val: data(for: name))
     case .nullableBool:
-      guard !cursor.isNull(for: name) else { return nil }
+      guard !isNull(for: name) else { return nil }
       fallthrough
     case .bool:
-      return .bool(val: cursor.bool(for: name))
+      return .bool(val: bool(for: name))
     case .nullableUUID:
-      guard !cursor.isNull(for: name) else { return nil }
+      guard !isNull(for: name) else { return nil }
       fallthrough
     case .uuid:
-      return .uuid(val: cursor.uuid(for: name))
+      return .uuid(val: uuid(for: name))
     case .nullableDate:
-      guard !cursor.isNull(for: name) else { return nil }
+      guard !isNull(for: name) else { return nil }
       fallthrough
     case .date:
-      return .date(val: cursor.date(for: name))
+      return .date(val: date(for: name))
     }
   }
   
-  // TODO: Move to extension on Cursor
-  func entityWithMetadata(cursor: Cursor) -> ReplicatingEntityWithMetadata {
-    let id = cursor.uuid(for: "id")
-    var fields: [String: CompleteFieldData] = [:]
-    for property in properties.values {
-      let value = fetch(cursor: cursor, property.name, type: property.type)
-      let lamport = cursor.int(for: "\(property.name)__lamport")
-      let sequencer = cursor.uuid(for: "\(property.name)__sequencer")
-      let sequenceNumber = cursor.int(for: "\(property.name)__sequenceNumber")
-      fields[property.name] = CompleteFieldData(lamport: lamport, sequencer: sequencer, sequenceNumber: sequenceNumber, value: value)
-    }
-    return ReplicatingEntityWithMetadata(id: id, fields: fields)
-  }
-  
-  func entity(cursor: Cursor) -> ReplicatingEntity {
-    var entity = ReplicatingEntity(entityType: name, id: cursor.uuid(for: "id"))
-    for property in properties.values {
-      entity[property.name] = fetch(cursor: cursor, property.name, type: property.type)
+
+  func entity(with schema: EntitySchema) -> ReplicatingEntity {
+    var entity = ReplicatingEntity(entityType: schema.name, id: uuid(for: "id"))
+    for property in schema.properties.values {
+      entity[property.name] = fetch(name: property.name, type: property.type)
     }
     return entity
+  }
+  
+  func entityWithMetadata(with schema: EntitySchema) -> ReplicatingEntityWithMetadata {
+    let id = uuid(for: "id")
+    var fields: [String: CompleteFieldData] = [:]
+    for property in schema.properties.values {
+      let value = fetch(name: property.name, type: property.type)
+      let lamport = int(for: "\(property.name)__lamport")
+      let sequencer = uuid(for: "\(property.name)__sequencer")
+      let sequenceNumber = int(for: "\(property.name)__sequenceNumber")
+      fields[property.name] = CompleteFieldData(lamport: lamport, sequencer: sequencer, sequenceNumber: sequenceNumber, value: value)
+    }
+    return ReplicatingEntityWithMetadata(entityType: schema.name, id: id, fields: fields)
   }
 }

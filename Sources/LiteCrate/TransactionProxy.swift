@@ -76,7 +76,15 @@ public final class TransactionProxy {
     return try db.query(sql, values)
   }
   
-  func save(_ entity: ReplicatingEntity) throws {
+  func merge(_ entity: ReplicatingEntityWithMetadata) throws {
+    guard isEnabled else {
+      fatalError("Do not use this proxy outside of the transaction closure")
+    }
+    
+    
+  }
+  
+  public func save(_ entity: ReplicatingEntity) throws {
     guard isEnabled else {
       fatalError("Do not use this proxy outside of the transaction closure")
     }
@@ -114,7 +122,7 @@ public final class TransactionProxy {
     let cursor = try db.query(schema.fieldsOnlySelectStatement(predicate: predicate), values)
     var returnValue = [ReplicatingEntity]()
     while cursor.step() {
-      returnValue.append(schema.entity(cursor: cursor))
+      returnValue.append(cursor.entity(with: schema))
     }
     return returnValue
   }
@@ -128,7 +136,7 @@ public final class TransactionProxy {
     let cursor = try db.query(schema.fieldsOnlySelectStatement(predicate: predicate))
     var returnValue = [ReplicatingEntityWithMetadata]()
     while cursor.step() {
-      returnValue.append(schema.entityWithMetadata(cursor: cursor))
+      returnValue.append(cursor.entityWithMetadata(with: schema))
     }
     return returnValue
   }
