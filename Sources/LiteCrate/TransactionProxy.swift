@@ -8,59 +8,18 @@
 import Foundation
 import LiteCrateCore
 
+protocol EntitySchema2: CaseIterable, RawRepresentable where RawValue == String {
+  
+}
+
+enum BaseballSchema: String, EntitySchema2 {
+  case banana
+  case poopoo
+  case lolol
+}
+
 public final class TransactionProxy {
   let nodeID = UUID() // TODO: Fix me.
-
-  public func fetch<T: ReplicatingModel>(_ type: T.Type, with primaryKey: UUID) throws -> T? {
-//    try fetch(type, where: "\(T.table.primaryKeyColumn) = ?", [primaryKey]).first
-    let cursor = try db.query("SELECT json_group_object(key, value) FROM Field WHERE objectID = ?", [primaryKey])
-    if cursor.step() {
-      let json = cursor.data(for: 0)
-      let decoder = JSONDecoder()
-      decoder.dateDecodingStrategy = .secondsSince1970
-      return try decoder.decode(T.self, from: json)
-    }
-    return nil
-  }
-  
-  public func fetch<T: ReplicatingModel>(_: T.Type) throws -> [T] {
-    let statement = """
-      SELECT json_group_object(key, value) FROM Field
-          WHERE objectType = ?
-          GROUP BY objectID
-    """
-    
-    let cursor = try db.query(statement, [T.objectName])
-    var results = [T]()
-    while cursor.step() {
-      let json = cursor.data(for: 0)
-      let decoder = JSONDecoder()
-      decoder.dateDecodingStrategy = .secondsSince1970
-      results.append(try decoder.decode(T.self, from: json))
-    }
-    return results
-  }
-  
-  public func fetch<T: ReplicatingModel>(_: T.Type, field: String, where sqlWhereClause: String,
-                                        _ values: [SqliteRepresentable?] = []) throws -> [T]
-  {
-    let statement = """
-      SELECT json_group_object(key, value) FROM Field
-          WHERE objectID IN
-              (SELECT objectID FROM Field WHERE objectType = ? AND key = ? AND \(sqlWhereClause))
-          GROUP BY objectID
-    """
-
-    let cursor = try db.query(statement, [T.objectName, field] + values)
-    var results = [T]()
-    while cursor.step() {
-      let json = cursor.data(for: 0)
-      let decoder = JSONDecoder()
-      decoder.dateDecodingStrategy = .secondsSince1970
-      results.append(try decoder.decode(T.self, from: json))
-    }
-    return results
-  }
 
   public func execute(_ sql: String, _ values: [SqliteRepresentable?] = []) throws {
     guard isEnabled else {
@@ -142,12 +101,6 @@ public final class TransactionProxy {
   }
   // MARK: - Old stuff below
   
-  public func save<T: DatabaseCodable>(_ model: T) throws {
-    let encoder = DatabaseEncoder()
-    try model.encode(to: encoder)
-    try db.execute(T.table.insertStatement(), encoder.insertValues)
-  }
-
   private func foreignKeyValueHasChanged<T: ReplicatingModel>(
     oldModel: T,
     newForeignKeyValues: [String: SqliteValue?]
@@ -157,27 +110,6 @@ public final class TransactionProxy {
     return encoder.foreignKeyValues(table: T.table) != newForeignKeyValues
   }
   
-  private func objectDoesExist(id: UUID) throws -> Bool {
-    return try db.query("SELECT id FROM ObjectRecord WHERE id = ?", [id]).step()
-  }
-
-  public func save<T: ReplicatingModel>(_ model: T, lamport: Int64? = nil, parents: [UUID] = []) throws {
-    var parents = parents
-    if parents.isEmpty {
-      parents.append(nodeID)
-    }
-    
-    try db.execute("INSERT OR IGNORE INTO ObjectRecord(id, objectType) VALUES (?, ?)", [model.id, T.objectName])
-    
-    let jsonEncoder = JSONEncoder()
-    jsonEncoder.dateEncodingStrategy = .secondsSince1970
-    let modelJSON = try jsonEncoder.encode(model)
-    let statement = """
-    INSERT INTO FieldInput SELECT ?, ?, ?, ?, ?, key, value FROM json_each(?)
-    """
-    #warning("Fix sequence stuff")
-    try db.execute(statement, [model.id, T.objectName, nodeID, 0, lamport, modelJSON])
-    
 //    guard var node = try fetch(Node.self, with: nodeID) else { return }
 //
 //    let encoder = DatabaseEncoder()
@@ -217,26 +149,10 @@ public final class TransactionProxy {
 //    try save(node)
 //
 //    try db.execute(T.table.insertStatement(), encoder.insertValues)
-  }
 
   public func delete<T: ReplicatingModel>(_ model: T) throws {
 //    guard let objectRecord = try fetch(ObjectRecord.self, with: model.id) else { return }
 //    try delete(objectRecord: objectRecord)
-  }
-
-  private func delete(objectRecord: ObjectRecord) throws {
-    guard var node = try fetch(Node.self, with: nodeID) else { return }
-
-//    for fkField in try fetch(ForeignKeyField.self, where: "referenceID = ?", [objectRecord.id]) {
-//      guard fkField.objectID != fkField.referenceID,
-//            let objectRecord = try fetch(ObjectRecord.self, with: fkField.objectID) else { continue }
-//      try delete(objectRecord: objectRecord)
-//    }
-//
-    let emptyRange = EmptyRange(objectRecord: objectRecord, sequencer: node)
-    node.nextSequenceNumber += 1
-    try save(node)
-    try mergeRangeAndDeleteMatchingModels(emptyRange)
   }
 
   private func mergeRangeAndDeleteMatchingModels(_ range: EmptyRange) throws {
@@ -252,7 +168,7 @@ public final class TransactionProxy {
     try execute("DELETE FROM ObjectRecord WHERE creator = ? AND ? <= creationNumber AND creationNumber >= ?",
                 [range.node, range.start, range.end])
 
-    try save(range)
+//    try save(range)
   }
 
   public func delete<T: DatabaseCodable>(_: T, where sqlWhereClause: String = "TRUE",
