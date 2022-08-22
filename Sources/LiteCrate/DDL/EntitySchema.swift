@@ -125,10 +125,6 @@ public struct EntitySchema {
   }
 }
 
-extension EntitySchema {
-  // TODO: Move to extension on Cursor
-}
-
 extension Cursor {
   func fetch(name: String, type: ExtendedSqliteType) -> ExtendedSqliteValue? {
     switch type {

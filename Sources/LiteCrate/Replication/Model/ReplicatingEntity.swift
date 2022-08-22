@@ -90,7 +90,50 @@ public struct ReplicatingEntity {
     self.id = id
     self.fields = [:]
   }
+  
+  public init<T>(entityType: String, object: T) throws where T: Codable & Identifiable, T.ID == UUID {
+    id = object.id
+    self.entityType = entityType
+    let encoder = DatabaseEncoder()
+    try object.encode(to: encoder)
+    fields = encoder.insertValues
+  }
+  
+  func int64(for key: String) -> Int64 {
+    guard case let .integer(val) = fields[key] else { fatalError() }
+    return val
+  }
+  
+  func string(for key: String) -> String {
+    guard case let .text(val) = fields[key] else { fatalError() }
+    return val
+  }
 
+  func bool(for key: String) -> Bool {
+    guard case let .bool(val) = fields[key] else { fatalError() }
+    return val
+  }
+
+  func data(for key: String) -> Data {
+    guard case let .blob(val) = fields[key] else { fatalError() }
+    return val
+  }
+  
+  func uuid(for key: String) -> UUID {
+    guard case let .uuid(val) = fields[key] else { fatalError() }
+    return val
+  }
+  
+  func date(for key: String) -> Date {
+    guard case let .date(val) = fields[key] else { fatalError() }
+    return val
+  }
+  
+  func isNull(for key: String) -> Bool {
+    guard let value = fields[key] else { fatalError() }
+    return value == nil
+  }
+  
   public subscript(_ key: String) -> ExtendedSqliteValue? {
     get {
       return fields[key]!

@@ -11,17 +11,7 @@ import LiteCrateCore
 class DatabaseEncoder: Encoder {
   var codingPath: [CodingKey] = []
   var userInfo: [CodingUserInfoKey: Any] = [:]
-  private(set) var insertValues: [String: SqliteRepresentable?] = [:]
-
-  func foreignKeyValues(table: Table) -> [String: SqliteValue?] {
-    var foreignKeys = [String: SqliteValue?]()
-    table.forEachForeignKey { key in
-      insertValues[key].flatMap {
-        foreignKeys[key] = $0?.asSqliteValue
-      }
-    }
-    return foreignKeys
-  }
+  private(set) var insertValues: [String: ExtendedSqliteValue?] = [:]
 
   struct KEC<Key: CodingKey>: KeyedEncodingContainerProtocol {
     var codingPath: [CodingKey] = []
@@ -32,76 +22,92 @@ class DatabaseEncoder: Encoder {
     }
 
     mutating func encode(_ value: Bool, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = value
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] = .bool(val: value)
     }
 
     mutating func encode(_ value: String, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = value
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] = .text(val: value)
     }
 
     mutating func encode(_ value: Double, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = value
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] = .real(val: value)
     }
 
     mutating func encode(_ value: Float, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = Double(value)
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] = .real(val: Double(value))
     }
 
     mutating func encode(_ value: Int, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = Int64(value)
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] = .integer(val: Int64(value))
     }
 
     mutating func encode(_ value: Int8, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = Int64(value)
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] = .integer(val: Int64(value))
     }
 
     mutating func encode(_ value: Int16, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = Int64(value)
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] = .integer(val: Int64(value))
     }
 
     mutating func encode(_ value: Int32, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = Int64(value)
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] =  .integer(val: Int64(value))
     }
 
     mutating func encode(_ value: Int64, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = value
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] = .integer(val: value)
     }
 
     mutating func encode(_ value: UInt, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = Int64(value)
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] =  .integer(val: Int64(value))
     }
 
     mutating func encode(_ value: UInt8, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = Int64(value)
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] =  .integer(val: Int64(value))
     }
 
     mutating func encode(_ value: UInt16, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = Int64(value)
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] =  .integer(val: Int64(value))
     }
 
     mutating func encode(_ value: UInt32, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = Int64(value)
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] =  .integer(val: Int64(value))
     }
 
     mutating func encode(_ value: UInt64, forKey key: Key) throws {
-      encoder.insertValues[key.stringValue] = Int64(value)
+      if key.stringValue == "id" { return }
+      encoder.insertValues[key.stringValue] =  .integer(val: Int64(value))
     }
 
     mutating func encodeIfPresent<T>(_ value: T?, forKey key: Key) throws where T: Encodable {
+      if key.stringValue == "id" { return }
       switch value {
       case .none:
         encoder.insertValues[key.stringValue] = nil
       case let value as SqliteRepresentable:
-        encoder.insertValues[key.stringValue] = value
+        encoder.insertValues[key.stringValue] = value.asSqliteValue.asExtendedSqliteValue
       default:
         fatalError("Incompatible type")
       }
     }
 
     mutating func encode<T>(_ value: T, forKey key: Key) throws where T: Encodable {
+      if key.stringValue == "id" { return }
       switch value {
       case let value as SqliteRepresentable:
-        encoder.insertValues[key.stringValue] = value
+        encoder.insertValues[key.stringValue] = value.asExtendedSqliteValue
       default:
         try value.encode(to: encoder)
       }

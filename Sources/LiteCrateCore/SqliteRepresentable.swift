@@ -54,7 +54,7 @@ public enum SqliteValue: Equatable, SqliteRepresentable {
   public var asSqliteValue: SqliteValue {
     return self
   }
-  
+
   case integer(val: Int64)
   case real(val: Double)
   case text(val: String)
@@ -62,6 +62,15 @@ public enum SqliteValue: Equatable, SqliteRepresentable {
 }
 
 public enum ExtendedSqliteValue: Equatable, SqliteRepresentable {
+  public init(_ value: SqliteValue)  {
+    switch value {
+    case let .integer(val): self = .integer(val: val)
+    case let .real(val): self = .real(val: val)
+    case let .text(val): self = .text(val: val)
+    case let .blob(val): self = .blob(val: val)
+    }
+  }
+  
   public var asSqliteValue: SqliteValue {
     switch self {
     case let .integer(val): return val.asSqliteValue
@@ -85,6 +94,13 @@ public enum ExtendedSqliteValue: Equatable, SqliteRepresentable {
 
 public protocol SqliteRepresentable: Codable {
   var asSqliteValue: SqliteValue { get }
+  var asExtendedSqliteValue: ExtendedSqliteValue { get }
+}
+
+public extension SqliteRepresentable {
+  var asExtendedSqliteValue: ExtendedSqliteValue {
+    return ExtendedSqliteValue(asSqliteValue)
+  }
 }
 
 extension Int64: SqliteRepresentable {

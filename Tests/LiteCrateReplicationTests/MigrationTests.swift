@@ -69,4 +69,30 @@ final class MigrationTests: XCTestCase {
       XCTAssertEqual(fetched.id, entity.id)
     }
   }
+  struct Person: Identifiable, Codable {
+    var id: UUID
+    var name: String
+    var age: Int64
+    
+  }
+  func testCRUDCodable() throws {
+    let schema = EntitySchema(name: "Person")
+      .withProperty("name", type: .text)
+      .withProperty("age", type: .integer)
+    
+    let liteCrate = try LiteCrate(":memory:", migrations: {})
+    liteCrate.register(schema)
+    
+    let person = Person(id: UUID(), name: "bob", age: 4)
+    
+    try liteCrate.inTransaction { db in
+      try db.execute(schema.createTableStatement())
+      try db.save(entityType: "Person", person)
+      let fetched = try db.fetch("Person", type: Person.self, with: person.id)!
+      XCTAssertEqual(person.id, fetched.id)
+      XCTAssertEqual(person.name, fetched.name)
+      XCTAssertEqual(person.age, fetched.age)
+    }
+  }
+
 }

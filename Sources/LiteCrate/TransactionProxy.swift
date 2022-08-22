@@ -39,8 +39,10 @@ public final class TransactionProxy {
     guard isEnabled else {
       fatalError("Do not use this proxy outside of the transaction closure")
     }
-    
-    
+  }
+  
+  public func save<T>(entityType: String, _ entity: T) throws where T: Codable & Identifiable, T.ID == UUID {
+    try save(ReplicatingEntity(entityType: entityType, object: entity))
   }
   
   public func save(_ entity: ReplicatingEntity) throws {
@@ -64,6 +66,11 @@ public final class TransactionProxy {
     }
   }
   
+  public func fetch<T>(_ entityType: String, type: T.Type, with id: UUID) throws -> T?
+  where T: Codable & Identifiable, T.ID == UUID {
+    return try fetch(entityType, type: type, predicate: "id = ?", [id]).first
+  }
+
   public func fetch(_ entityType: String, with id: UUID) throws -> ReplicatingEntity? {
     return try fetch(entityType, predicate: "id = ?", [id]).first
   }
@@ -71,6 +78,24 @@ public final class TransactionProxy {
   private func fetchWithMetadata(_ entityType: String, with id: UUID) throws -> ReplicatingEntityWithMetadata? {
     return try fetchWithMetadata(entityType, predicate: "id = ?", [id]).first
   }
+  
+  public func fetch<T>(_ entityType: String, type: T.Type, predicate: String = "TRUE", _ values: [SqliteRepresentable?] = []) throws -> [T]
+where T: Codable & Identifiable, T.ID == UUID {
+    guard isEnabled else {
+      fatalError("Do not use this proxy outside of the transaction closure")
+    }
+    
+    guard let schema = liteCrate.schemas[entityType] else { fatalError() }
+    let cursor = try db.query(schema.fieldsOnlySelectStatement(predicate: predicate), values)
+    let databaseDecorder = DatabaseDecoder(cursor: cursor)
+
+    var returnValue = [T]()
+    while cursor.step() {
+      try returnValue.append(T.init(from: databaseDecorder))
+    }
+    return returnValue
+  }
+
   
   public func fetch(_ entityType: String, predicate: String = "TRUE", _ values: [SqliteRepresentable?] = []) throws -> [ReplicatingEntity] {
     guard isEnabled else {
@@ -101,14 +126,7 @@ public final class TransactionProxy {
   }
   // MARK: - Old stuff below
   
-  private func foreignKeyValueHasChanged<T: ReplicatingModel>(
-    oldModel: T,
-    newForeignKeyValues: [String: SqliteValue?]
-  ) throws -> Bool {
-    let encoder = DatabaseEncoder()
-    try oldModel.encode(to: encoder)
-    return encoder.foreignKeyValues(table: T.table) != newForeignKeyValues
-  }
+  
   
 //    guard var node = try fetch(Node.self, with: nodeID) else { return }
 //
