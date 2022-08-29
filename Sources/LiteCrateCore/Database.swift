@@ -71,6 +71,19 @@ public class Database {
           SQLITE_TRANSIENT
         )
       }
+    case let .bool(val):
+      sqlite3_bind_int64(statement, columnIndex, val ? 1 : 0)
+    case let .uuid(val):
+      let uuidString = val.uuidString
+      sqlite3_bind_text(
+        statement,
+        columnIndex,
+        uuidString,
+        Int32(uuidString.lengthOfBytes(using: .utf8)),
+        SQLITE_TRANSIENT
+      )
+    case let .date(val: val):
+      sqlite3_bind_int64(statement, columnIndex, Int64(val.timeIntervalSince1970))
     case .none:
       sqlite3_bind_null(statement, columnIndex)
     }

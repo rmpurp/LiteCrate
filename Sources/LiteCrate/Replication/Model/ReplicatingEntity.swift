@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 8/12/22.
 //
@@ -12,11 +12,11 @@ struct CompleteFieldData {
   var lamport: Int64
   var sequencer: UUID
   var sequenceNumber: Int64
-  var value: ExtendedSqliteValue?
+  var value: SQLiteValue?
 }
 
 enum FieldType {
-  case dataOnly(fields: [String: ExtendedSqliteValue?])
+  case dataOnly(fields: [String: SQLiteValue?])
   case dataAndMetadata(fields: [String: CompleteFieldData])
 }
 
@@ -24,13 +24,13 @@ struct ReplicatingEntityWithMetadata {
   let entityType: String
   var fields: [String: CompleteFieldData]
   let id: UUID
-  
+
   init(entityType: String, id: UUID, fields: [String: CompleteFieldData]) {
     self.entityType = entityType
     self.fields = fields
     self.id = id
   }
-  
+
   init(newReplicatingEntity: ReplicatingEntity, creator: UUID, sequenceNumber: Int64) {
     entityType = newReplicatingEntity.entityType
     fields = [:]
@@ -39,7 +39,7 @@ struct ReplicatingEntityWithMetadata {
       fields[key] = CompleteFieldData(lamport: 0, sequencer: creator, sequenceNumber: sequenceNumber, value: value)
     }
   }
-  
+
   mutating func merge(_ entity: ReplicatingEntity, sequencer: UUID, sequenceNumber: Int64) {
     precondition(entityType == entity.entityType)
     for (key, value) in entity.fields {
@@ -52,20 +52,21 @@ struct ReplicatingEntityWithMetadata {
       }
     }
   }
-  
+
   mutating func merge(_ entity: ReplicatingEntityWithMetadata) {
     precondition(entityType == entity.entityType)
 
     for (key, otherField) in entity.fields {
       guard let existing = fields[key] else { fatalError("Incompatible schema!") }
       if existing.lamport < otherField.lamport
-          || existing.lamport == otherField.lamport
-              && otherField.sequencer.uuidString > existing.sequencer.uuidString {
+        || existing.lamport == otherField.lamport
+        && otherField.sequencer.uuidString > existing.sequencer.uuidString
+      {
         fields[key] = otherField
       }
     }
   }
-  
+
   func insertValues() -> [String: SqliteRepresentable?] {
     var insertDict = [String: SqliteRepresentable?]()
     insertDict["id"] = id
@@ -83,14 +84,14 @@ struct ReplicatingEntityWithMetadata {
 public struct ReplicatingEntity {
   public let entityType: String
   public let id: UUID
-  public private(set) var fields: [String: ExtendedSqliteValue?]
+  public private(set) var fields: [String: SQLiteValue?]
 
   public init(entityType: String, id: UUID) {
     self.entityType = entityType
     self.id = id
-    self.fields = [:]
+    fields = [:]
   }
-  
+
   public init<T>(entityType: String, object: T) throws where T: Codable & Identifiable, T.ID == UUID {
     id = object.id
     self.entityType = entityType
@@ -98,12 +99,12 @@ public struct ReplicatingEntity {
     try object.encode(to: encoder)
     fields = encoder.insertValues
   }
-  
+
   func int64(for key: String) -> Int64 {
     guard case let .integer(val) = fields[key] else { fatalError() }
     return val
   }
-  
+
   func string(for key: String) -> String {
     guard case let .text(val) = fields[key] else { fatalError() }
     return val
@@ -118,25 +119,25 @@ public struct ReplicatingEntity {
     guard case let .blob(val) = fields[key] else { fatalError() }
     return val
   }
-  
+
   func uuid(for key: String) -> UUID {
     guard case let .uuid(val) = fields[key] else { fatalError() }
     return val
   }
-  
+
   func date(for key: String) -> Date {
     guard case let .date(val) = fields[key] else { fatalError() }
     return val
   }
-  
+
   func isNull(for key: String) -> Bool {
     guard let value = fields[key] else { fatalError() }
     return value == nil
   }
-  
-  public subscript(_ key: String) -> ExtendedSqliteValue? {
+
+  public subscript(_ key: String) -> SQLiteValue? {
     get {
-      return fields[key]!
+      fields[key]!
     }
     set {
       fields[key] = newValue

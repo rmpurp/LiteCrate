@@ -11,5 +11,4 @@ extension DispatchSemaphore {
 }
 
 @available(macOS 12.0, *)
-final class LiteCrateTests: XCTestCase {
-}
+final class LiteCrateTests: XCTestCase {}

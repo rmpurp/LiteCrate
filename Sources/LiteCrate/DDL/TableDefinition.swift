@@ -43,20 +43,20 @@ extension ColumnProtocol {
 /// A normal column of a table, with no constraints.
 struct Column: ColumnProtocol {
   let name: String
-  let type: SqliteType
+  let type: SQLiteType
 
-  init(name: String, type: SqliteType) {
+  init(name: String, type: SQLiteType) {
     self.name = name
     self.type = type
   }
 
-  init<C: CodingKey>(_ codingKey: C, type: SqliteType) {
+  init<C: CodingKey>(_ codingKey: C, type: SQLiteType) {
     name = codingKey.stringValue
     self.type = type
   }
 
   func columnDefinition() -> String {
-    "\(name) \(type.rawValue)"
+    "\(name) \(type.typeDefinition)"
   }
 
   func constraintDefinitions() -> [String] {
@@ -261,4 +261,3 @@ public struct Table {
     return "INSERT INTO \(tableName)(\(insertColumns)) VALUES (\(valueColumns))"
   }
 }
-

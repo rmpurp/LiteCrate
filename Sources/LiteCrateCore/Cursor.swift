@@ -103,7 +103,7 @@ public class Cursor {
     guard let uuid = UUID(uuidString: uuidString) else { fatalError("Invalid UUID string: \(uuidString)") }
     return uuid
   }
-  
+
   public func isNull(for index: Int32) -> Bool {
     guard !closed else { fatalError("Operating on a closed statement.") }
     return sqlite3_column_text(statement, index) == nil
@@ -113,32 +113,32 @@ public class Cursor {
     guard let index = columnToIndex[column] else { fatalError("Column does not exist.") }
     return string(for: index)
   }
-  
+
   public func int(for column: String) -> Int64 {
     guard let index = columnToIndex[column] else { fatalError("Column does not exist.") }
     return int(for: index)
   }
-  
+
   public func double(for column: String) -> Double {
     guard let index = columnToIndex[column] else { fatalError("Column does not exist.") }
     return double(for: index)
   }
-  
+
   public func bool(for column: String) -> Bool {
     guard let index = columnToIndex[column] else { fatalError("Column does not exist.") }
     return bool(for: index)
   }
-  
+
   public func data(for column: String) -> Data {
     guard let index = columnToIndex[column] else { fatalError("Column does not exist.") }
     return data(for: index)
   }
-  
+
   public func date(for column: String) -> Date {
     guard let index = columnToIndex[column] else { fatalError("Column does not exist.") }
     return date(for: index)
   }
-  
+
   public func uuid(for column: String) -> UUID {
     guard let index = columnToIndex[column] else { fatalError("Column does not exist.") }
     return uuid(for: index)
@@ -149,7 +149,6 @@ public class Cursor {
     guard let index = columnToIndex[column] else { fatalError("Column does not exist.") }
     return isNull(for: index)
   }
-  
 
   /// Close this statement.
   /// It is OK to call this multiple times.

@@ -1,6 +1,6 @@
 //
 //  File.swift
-//  
+//
 //
 //  Created by Ryan Purpura on 8/11/22.
 //
@@ -12,38 +12,38 @@ enum SubcolumnSchema: String, CaseIterable {
   case lamport
   case sequencer
   case sequenceNumber
-  
-  var type: ExtendedSqliteType {
+
+  var type: SQLiteType {
     switch self {
     case .lamport: return .integer
     case .sequencer: return .uuid
     case .sequenceNumber: return .integer
     }
   }
-  
+
   func columnName(from baseName: String) -> String {
     "\(baseName)__\(rawValue)"
   }
 }
 
 /// A property, corresponding to a column that is not a foreign key.
-fileprivate struct PropertySchema {
+private struct PropertySchema {
   var name: String
-  var type: ExtendedSqliteType
-  
+  var type: SQLiteType
+
   func columnDefinitions() -> [String] {
     var definitions = [String]()
-    definitions.append("\(name) \(type.sqliteType.rawValue)")
+    definitions.append("\(name) \(type.typeDefinition)")
     for subcolumn in SubcolumnSchema.allCases {
-      definitions.append("\(subcolumn.columnName(from: name)) \(subcolumn.type.sqliteType.rawValue)")
+      definitions.append("\(subcolumn.columnName(from: name)) \(subcolumn.type.typeDefinition)")
     }
     return definitions
   }
-  
+
   func columnNames() -> [String] {
     var columns = [String]()
     columns.append("\(name)")
-    columns.append(contentsOf: SubcolumnSchema.allCases.map {$0.columnName(from: name)})
+    columns.append(contentsOf: SubcolumnSchema.allCases.map { $0.columnName(from: name) })
     return columns
   }
 }
@@ -53,30 +53,30 @@ public struct EntitySchema {
   enum SchemaError: Error {
     case nameAlreadyUsed
   }
-  
+
   public private(set) var name: String
   fileprivate var properties: [String: PropertySchema] = [:]
-  fileprivate var relationships: [String: String] = [:]
+  private var relationships: [String: String] = [:]
   private var usedNames: Set<String>
-  
+
   public init(name: String) {
     self.name = name
-    self.usedNames = []
+    usedNames = []
   }
-  
+
   /// For the first version, start at 1.
-  func withProperty(_ propertyName: String, type: ExtendedSqliteType) -> EntitySchema {
+  func withProperty(_ propertyName: String, type: SQLiteType) -> EntitySchema {
     var schema = self
     do {
       guard schema.properties[propertyName] == nil else { throw SchemaError.nameAlreadyUsed }
     } catch {
       preconditionFailure()
     }
-      
+
     schema.properties[propertyName] = PropertySchema(name: propertyName, type: type)
     return schema
   }
-  
+
   /// Ignored if version is not the first version. May be changed in the future.
   /// For the first version, start at 1.
   func withRelationship(_ relationshipName: String, reference: String, nullable: Bool = false) -> EntitySchema {
@@ -90,43 +90,43 @@ public struct EntitySchema {
     schema.relationships[relationshipName] = reference
     return schema
   }
-  
+
   public func createTableStatement() -> String {
     var columnDefinitions = properties.values.flatMap { $0.columnDefinitions() }
     var columnConstraints = [String]()
     columnDefinitions.append("id TEXT NOT NULL PRIMARY KEY")
-    
+
     for (column, reference) in relationships {
       columnConstraints.append("FOREIGN KEY (\(column)) REFERENCES \(reference)(id)")
     }
-    
-    return "CREATE TABLE \(name)(\((columnDefinitions + columnConstraints).joined(separator: ",\n    ")))"
+
+    return "CREATE TABLE \(name)(\((columnDefinitions + columnConstraints).joined(separator: ",\n    "))) STRICT"
   }
-  
+
   func insertStatement() -> String {
-    let columns = properties.values.flatMap { $0.columnNames () } + ["id"]
+    let columns = properties.values.flatMap { $0.columnNames() } + ["id"]
     let insertColumns = columns.joined(separator: ",")
-    let valueColumns = columns.map{ ":\($0)" }.joined(separator: ",")
-    
+    let valueColumns = columns.map { ":\($0)" }.joined(separator: ",")
+
     return "INSERT INTO \(name)(\(insertColumns)) VALUES (\(valueColumns))"
   }
-  
+
   func completeSelectStatement(predicate: String = "TRUE") -> String {
     // TODO: Fix me.
-    let columns = (properties.values.map(\.name) + ["id"]).map {"\($0) AS \($0)"}.joined(separator: ",")
+    let columns = (properties.values.map(\.name) + ["id"]).map { "\($0) AS \($0)" }.joined(separator: ",")
 
     return "SELECT \(columns) FROM \(name) WHERE \(predicate)"
   }
-  
+
   func fieldsOnlySelectStatement(predicate: String = "TRUE") -> String {
-    let columns = (properties.values.map(\.name) + ["id"]).map {"\($0) AS \($0)"}.joined(separator: ",")
-    
+    let columns = (properties.values.map(\.name) + ["id"]).map { "\($0) AS \($0)" }.joined(separator: ",")
+
     return "SELECT \(columns) FROM \(name) WHERE \(predicate)"
   }
 }
 
 extension Cursor {
-  func fetch(name: String, type: ExtendedSqliteType) -> ExtendedSqliteValue? {
+  func fetch(name: String, type: SQLiteType) -> SQLiteValue? {
     switch type {
     case .nullableInteger:
       guard !isNull(for: name) else { return nil }
@@ -165,7 +165,6 @@ extension Cursor {
       return .date(val: date(for: name))
     }
   }
-  
 
   func entity(with schema: EntitySchema) -> ReplicatingEntity {
     var entity = ReplicatingEntity(entityType: schema.name, id: uuid(for: "id"))
@@ -174,7 +173,7 @@ extension Cursor {
     }
     return entity
   }
-  
+
   func entityWithMetadata(with schema: EntitySchema) -> ReplicatingEntityWithMetadata {
     let id = uuid(for: "id")
     var fields: [String: CompleteFieldData] = [:]
@@ -183,7 +182,12 @@ extension Cursor {
       let lamport = int(for: "\(property.name)__lamport")
       let sequencer = uuid(for: "\(property.name)__sequencer")
       let sequenceNumber = int(for: "\(property.name)__sequenceNumber")
-      fields[property.name] = CompleteFieldData(lamport: lamport, sequencer: sequencer, sequenceNumber: sequenceNumber, value: value)
+      fields[property.name] = CompleteFieldData(
+        lamport: lamport,
+        sequencer: sequencer,
+        sequenceNumber: sequenceNumber,
+        value: value
+      )
     }
     return ReplicatingEntityWithMetadata(entityType: schema.name, id: id, fields: fields)
   }

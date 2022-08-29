@@ -16,7 +16,7 @@ public class LiteCrate {
   private var db: Database
   let nodeID = UUID() // TODO: Fix me.
   private(set) var schemas = [String: EntitySchema]()
-  
+
   public init(
     _ location: String,
     @MigrationBuilder migrations: () -> Migration
@@ -25,7 +25,7 @@ public class LiteCrate {
     try db.execute("PRAGMA FOREIGN_KEYS = TRUE")
     try runMigrations(migration: migrations())
   }
-  
+
   public func register(_ schema: EntitySchema) {
     schemas[schema.name] = schema
   }
@@ -51,7 +51,7 @@ public class LiteCrate {
           UNIQUE (id, objectType)
       )
       """)
-      
+
       // Bootstrap this node.
       try proxy.execute("""
           INSERT INTO ObjectRecord VALUES (?, 'Node', 0)

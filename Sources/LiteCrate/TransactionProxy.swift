@@ -8,9 +8,7 @@
 import Foundation
 import LiteCrateCore
 
-protocol EntitySchema2: CaseIterable, RawRepresentable where RawValue == String {
-  
-}
+protocol EntitySchema2: CaseIterable, RawRepresentable where RawValue == String {}
 
 enum BaseballSchema: String, EntitySchema2 {
   case banana
@@ -34,17 +32,17 @@ public final class TransactionProxy {
     }
     return try db.query(sql, values)
   }
-  
-  func merge(_ entity: ReplicatingEntityWithMetadata) throws {
+
+  func merge(_: ReplicatingEntityWithMetadata) throws {
     guard isEnabled else {
       fatalError("Do not use this proxy outside of the transaction closure")
     }
   }
-  
+
   public func save<T>(entityType: String, _ entity: T) throws where T: Codable & Identifiable, T.ID == UUID {
     try save(ReplicatingEntity(entityType: entityType, object: entity))
   }
-  
+
   public func save(_ entity: ReplicatingEntity) throws {
     guard isEnabled else {
       fatalError("Do not use this proxy outside of the transaction closure")
@@ -53,51 +51,56 @@ public final class TransactionProxy {
     guard let schema = liteCrate.schemas[entity.entityType] else {
       fatalError()
     }
-    
+
     if var existingEntityWithMetadata = try fetchWithMetadata(entity.entityType, with: entity.id) {
       existingEntityWithMetadata.merge(entity, sequencer: nodeID, sequenceNumber: TEMPsequenceNumber)
       TEMPsequenceNumber += 1
       try db.execute(schema.insertStatement(), existingEntityWithMetadata.insertValues())
     } else {
       let entityWithMetadata = ReplicatingEntityWithMetadata(
-          newReplicatingEntity: entity, creator: nodeID, sequenceNumber: TEMPsequenceNumber)
+        newReplicatingEntity: entity, creator: nodeID, sequenceNumber: TEMPsequenceNumber
+      )
       TEMPsequenceNumber += 1
       try db.execute(schema.insertStatement(), entityWithMetadata.insertValues())
     }
   }
-  
+
   public func fetch<T>(_ entityType: String, type: T.Type, with id: UUID) throws -> T?
-  where T: Codable & Identifiable, T.ID == UUID {
-    return try fetch(entityType, type: type, predicate: "id = ?", [id]).first
+    where T: Codable & Identifiable, T.ID == UUID
+  {
+    try fetch(entityType, type: type, predicate: "id = ?", [id]).first
   }
 
   public func fetch(_ entityType: String, with id: UUID) throws -> ReplicatingEntity? {
-    return try fetch(entityType, predicate: "id = ?", [id]).first
+    try fetch(entityType, predicate: "id = ?", [id]).first
   }
-  
+
   private func fetchWithMetadata(_ entityType: String, with id: UUID) throws -> ReplicatingEntityWithMetadata? {
-    return try fetchWithMetadata(entityType, predicate: "id = ?", [id]).first
+    try fetchWithMetadata(entityType, predicate: "id = ?", [id]).first
   }
-  
-  public func fetch<T>(_ entityType: String, type: T.Type, predicate: String = "TRUE", _ values: [SqliteRepresentable?] = []) throws -> [T]
-where T: Codable & Identifiable, T.ID == UUID {
+
+  public func fetch<T>(_ entityType: String, type _: T.Type, predicate: String = "TRUE",
+                       _ values: [SqliteRepresentable?] = []) throws -> [T]
+    where T: Codable & Identifiable, T.ID == UUID
+  {
     guard isEnabled else {
       fatalError("Do not use this proxy outside of the transaction closure")
     }
-    
+
     guard let schema = liteCrate.schemas[entityType] else { fatalError() }
     let cursor = try db.query(schema.fieldsOnlySelectStatement(predicate: predicate), values)
     let databaseDecorder = DatabaseDecoder(cursor: cursor)
 
     var returnValue = [T]()
     while cursor.step() {
-      try returnValue.append(T.init(from: databaseDecorder))
+      try returnValue.append(T(from: databaseDecorder))
     }
     return returnValue
   }
 
-  
-  public func fetch(_ entityType: String, predicate: String = "TRUE", _ values: [SqliteRepresentable?] = []) throws -> [ReplicatingEntity] {
+  public func fetch(_ entityType: String, predicate: String = "TRUE",
+                    _ values: [SqliteRepresentable?] = []) throws -> [ReplicatingEntity]
+  {
     guard isEnabled else {
       fatalError("Do not use this proxy outside of the transaction closure")
     }
@@ -111,7 +114,9 @@ where T: Codable & Identifiable, T.ID == UUID {
     return returnValue
   }
 
-  func fetchWithMetadata(_ entityType: String, predicate: String = "TRUE", _ values: [SqliteRepresentable?] = []) throws -> [ReplicatingEntityWithMetadata] {
+  func fetchWithMetadata(_ entityType: String, predicate: String = "TRUE",
+                         _: [SqliteRepresentable?] = []) throws -> [ReplicatingEntityWithMetadata]
+  {
     guard isEnabled else {
       fatalError("Do not use this proxy outside of the transaction closure")
     }
@@ -124,10 +129,9 @@ where T: Codable & Identifiable, T.ID == UUID {
     }
     return returnValue
   }
+
   // MARK: - Old stuff below
-  
-  
-  
+
 //    guard var node = try fetch(Node.self, with: nodeID) else { return }
 //
 //    let encoder = DatabaseEncoder()
@@ -168,7 +172,7 @@ where T: Codable & Identifiable, T.ID == UUID {
 //
 //    try db.execute(T.table.insertStatement(), encoder.insertValues)
 
-  public func delete<T: ReplicatingModel>(_ model: T) throws {
+  public func delete<T: ReplicatingModel>(_: T) throws {
 //    guard let objectRecord = try fetch(ObjectRecord.self, with: model.id) else { return }
 //    try delete(objectRecord: objectRecord)
   }
@@ -207,7 +211,7 @@ where T: Codable & Identifiable, T.ID == UUID {
 
   internal init(liteCrate: LiteCrate, database: Database) {
     self.liteCrate = liteCrate
-    self.db = database
+    db = database
   }
 }
 
