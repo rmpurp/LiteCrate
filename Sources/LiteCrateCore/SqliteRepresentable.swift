@@ -48,9 +48,16 @@ public enum SQLiteValue: Equatable, SqliteRepresentable {
   case bool(val: Bool)
   case uuid(val: UUID)
   case date(val: Date)
+  
+  public init(columnValue: ColumnValue) {
+    #warning("Remove me.")
+    print("WARNING: This should be removed at some point.")
+    self = .text(val: columnValue.string)
+  }
 }
 
 public protocol SqliteRepresentable: Codable {
+  init(columnValue: ColumnValue)
   var asSqliteValue: SQLiteValue { get }
 }
 
@@ -64,23 +71,43 @@ public extension SQLiteValue {
 
 extension Int64: SqliteRepresentable {
   public var asSqliteValue: SQLiteValue { .integer(val: self) }
+  
+  public init(columnValue: ColumnValue) {
+    self = columnValue.int
+  }
 }
 
 extension Double: SqliteRepresentable {
   public var asSqliteValue: SQLiteValue { .real(val: self) }
+  
+  public init(columnValue: ColumnValue) {
+    self = columnValue.double
+  }
 }
 
 extension String: SqliteRepresentable {
   public var asSqliteValue: SQLiteValue { .text(val: self) }
+
+  public init(columnValue: ColumnValue) {
+    self = columnValue.string
+  }
 }
 
 extension Data: SqliteRepresentable {
   public var asSqliteValue: SQLiteValue { .blob(val: self) }
+  
+  public init(columnValue: ColumnValue) {
+    self = columnValue.data
+  }
 }
 
 extension Date: SqliteRepresentable {
   public var asSqliteValue: SQLiteValue {
     .date(val: self)
+  }
+  
+  public init(columnValue: ColumnValue) {
+    self = columnValue.date
   }
 }
 
@@ -88,10 +115,19 @@ extension Bool: SqliteRepresentable {
   public var asSqliteValue: SQLiteValue {
     .bool(val: self)
   }
+  
+  public init(columnValue: ColumnValue) {
+    self = columnValue.bool
+  }
+
 }
 
 extension UUID: SqliteRepresentable {
   public var asSqliteValue: SQLiteValue {
     .uuid(val: self)
+  }
+  
+  public init(columnValue: ColumnValue) {
+    self = columnValue.uuid
   }
 }

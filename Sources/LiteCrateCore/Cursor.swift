@@ -10,6 +10,25 @@ import sqlite3
 
 typealias SqliteStatement = OpaquePointer
 
+public struct ColumnValue {
+  private var cursor: Cursor
+  private var columnIndex: Int32
+  init(cursor: Cursor, columnIndex: Int32) {
+    self.cursor = cursor
+    self.columnIndex = columnIndex
+  }
+  
+  var null: Bool { cursor.isNull(for: columnIndex) }
+  var string: String { cursor.string(for: columnIndex) }
+  var int: Int64 { cursor.int(for: columnIndex) }
+  var double: Double { cursor.double(for: columnIndex) }
+  var bool: Bool { cursor.bool(for: columnIndex) }
+  var uuid: UUID { cursor.uuid(for: columnIndex) }
+  var date: Date { cursor.date(for: columnIndex) }
+  var data: Data { cursor.data(for: columnIndex) }
+
+}
+
 public class Cursor {
   private let database: Database
   private let statement: SqliteStatement
@@ -149,9 +168,14 @@ public class Cursor {
     guard let index = columnToIndex[column] else { fatalError("Column does not exist.") }
     return isNull(for: index)
   }
+  
+  public func columnValue(for column: String) -> ColumnValue {
+    guard let index = columnToIndex[column] else { fatalError("Column does not exist.") }
+    return ColumnValue(cursor: self, columnIndex: index)
+  }
 
   /// Close this statement.
-  /// It is OK to call this multiple times.
+  /// It is OK to call this multiple times, as long as you don't call it from different threads.
   /// This will be automatically called when this object is deinited.
   public func close() {
     guard !closed else { return }
