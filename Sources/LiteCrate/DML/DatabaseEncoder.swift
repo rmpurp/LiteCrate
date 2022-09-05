@@ -11,7 +11,7 @@ import LiteCrateCore
 class DatabaseEncoder: Encoder {
   var codingPath: [CodingKey] = []
   var userInfo: [CodingUserInfoKey: Any] = [:]
-  private(set) var insertValues: [String: SQLiteValue?] = [:]
+  private(set) var insertValues: [String: SQLiteValue] = [:]
 
   struct KEC<Key: CodingKey>: KeyedEncodingContainerProtocol {
     var codingPath: [CodingKey] = []
@@ -23,7 +23,7 @@ class DatabaseEncoder: Encoder {
 
     mutating func encode(_ value: Bool, forKey key: Key) throws {
       if key.stringValue == "id" { return }
-      encoder.insertValues[key.stringValue] = .bool(val: value)
+      encoder.insertValues[key.stringValue] = value.asSqliteValue
     }
 
     mutating func encode(_ value: String, forKey key: Key) throws {

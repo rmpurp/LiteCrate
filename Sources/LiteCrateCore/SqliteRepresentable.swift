@@ -15,26 +15,20 @@ public enum SQLiteType: Codable {
   case real
   case text
   case blob
-  case bool
-  case uuid
-  case date
   case nullableInteger
   case nullableReal
   case nullableText
   case nullableBlob
-  case nullableBool
-  case nullableUUID
-  case nullableDate
 
   public var typeDefinition: String {
     switch self {
-    case .integer, .date, .bool: return "INTEGER NOT NULL"
+    case .integer: return "INTEGER NOT NULL"
     case .real: return "REAL NOT NULL"
-    case .text, .uuid: return "TEXT NOT NULL"
+    case .text: return "TEXT NOT NULL"
     case .blob: return "BLOB NOT NULL"
-    case .nullableInteger, .nullableDate, .nullableBool: return "INTEGER"
+    case .nullableInteger: return "INTEGER"
     case .nullableReal: return "REAL"
-    case .nullableText, .nullableUUID: return "TEXT"
+    case .nullableText: return "TEXT"
     case .nullableBlob: return "BLOB"
     }
   }
@@ -45,20 +39,21 @@ public enum SQLiteValue: Equatable, SqliteRepresentable {
   case real(val: Double)
   case text(val: String)
   case blob(val: Data)
-  case bool(val: Bool)
-  case uuid(val: UUID)
-  case date(val: Date)
+  case null
   
   public init(columnValue: ColumnValue) {
-    #warning("Remove me.")
-    print("WARNING: This should be removed at some point.")
     self = .text(val: columnValue.string)
+  }
+  
+  public static var sqliteType: SQLiteType {
+    .text
   }
 }
 
 public protocol SqliteRepresentable: Codable {
   init(columnValue: ColumnValue)
   var asSqliteValue: SQLiteValue { get }
+  static var sqliteType: SQLiteType { get }
 }
 
 // MARK: - SQLite Representable Conformances
@@ -75,6 +70,10 @@ extension Int64: SqliteRepresentable {
   public init(columnValue: ColumnValue) {
     self = columnValue.int
   }
+  
+  static public var sqliteType: SQLiteType {
+    return .integer
+  }
 }
 
 extension Double: SqliteRepresentable {
@@ -82,6 +81,10 @@ extension Double: SqliteRepresentable {
   
   public init(columnValue: ColumnValue) {
     self = columnValue.double
+  }
+  
+  public static var sqliteType: SQLiteType {
+    return .real
   }
 }
 
@@ -91,6 +94,10 @@ extension String: SqliteRepresentable {
   public init(columnValue: ColumnValue) {
     self = columnValue.string
   }
+  
+  public static var sqliteType: SQLiteType {
+    return .text
+  }
 }
 
 extension Data: SqliteRepresentable {
@@ -99,35 +106,83 @@ extension Data: SqliteRepresentable {
   public init(columnValue: ColumnValue) {
     self = columnValue.data
   }
+  
+  public static var sqliteType: SQLiteType {
+    return .blob
+  }
 }
 
 extension Date: SqliteRepresentable {
   public var asSqliteValue: SQLiteValue {
-    .date(val: self)
+    .integer(val: Int64(timeIntervalSince1970))
   }
   
   public init(columnValue: ColumnValue) {
     self = columnValue.date
   }
+  
+  public static var sqliteType: SQLiteType {
+    return .integer
+  }
 }
 
 extension Bool: SqliteRepresentable {
   public var asSqliteValue: SQLiteValue {
-    .bool(val: self)
+    .integer(val: self ? 1 : 0)
   }
   
   public init(columnValue: ColumnValue) {
     self = columnValue.bool
   }
 
+  public static var sqliteType: SQLiteType {
+    return .integer
+  }
 }
 
 extension UUID: SqliteRepresentable {
   public var asSqliteValue: SQLiteValue {
-    .uuid(val: self)
+    .text(val: uuidString)
   }
   
   public init(columnValue: ColumnValue) {
     self = columnValue.uuid
   }
+  
+  public static var sqliteType: SQLiteType {
+    return .text
+  }
+}
+
+extension Optional: SqliteRepresentable where Wrapped: SqliteRepresentable {
+  public init(columnValue: ColumnValue) {
+    if columnValue.null {
+      self = .none
+    } else {
+      self = Wrapped(columnValue: columnValue)
+    }
+  }
+  
+  public var asSqliteValue: SQLiteValue {
+    if let self {
+      return self.asSqliteValue
+    } else {
+      return .null
+    }
+  }
+  
+  public static var sqliteType: SQLiteType {
+    switch Wrapped.sqliteType {
+    case .integer, .nullableInteger:
+      return .nullableInteger
+    case .real, .nullableReal:
+      return .nullableReal
+    case .text, .nullableText:
+      return .nullableText
+    case .blob, .nullableBlob:
+      return .nullableBlob
+    }
+  }
+  
+  
 }

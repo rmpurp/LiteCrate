@@ -8,14 +8,6 @@
 import Foundation
 import LiteCrateCore
 
-protocol EntitySchema2: CaseIterable, RawRepresentable where RawValue == String {}
-
-enum BaseballSchema: String, EntitySchema2 {
-  case banana
-  case poopoo
-  case lolol
-}
-
 public final class TransactionProxy {
   let nodeID = UUID() // TODO: Fix me.
 

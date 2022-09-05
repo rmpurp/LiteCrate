@@ -53,8 +53,8 @@ public class Database {
     }
   }
 
-  private func bind(parameter: SqliteRepresentable?, at columnIndex: Int32, to statement: SqliteStatement) {
-    switch parameter?.asSqliteValue {
+  private func bind(parameter: SQLiteValue, at columnIndex: Int32, to statement: SqliteStatement) {
+    switch parameter {
     case let .integer(val):
       sqlite3_bind_int64(statement, columnIndex, val)
     case let .real(val):
@@ -71,20 +71,7 @@ public class Database {
           SQLITE_TRANSIENT
         )
       }
-    case let .bool(val):
-      sqlite3_bind_int64(statement, columnIndex, val ? 1 : 0)
-    case let .uuid(val):
-      let uuidString = val.uuidString
-      sqlite3_bind_text(
-        statement,
-        columnIndex,
-        uuidString,
-        Int32(uuidString.lengthOfBytes(using: .utf8)),
-        SQLITE_TRANSIENT
-      )
-    case let .date(val: val):
-      sqlite3_bind_int64(statement, columnIndex, Int64(val.timeIntervalSince1970))
-    case .none:
+    case .null:
       sqlite3_bind_null(statement, columnIndex)
     }
   }
@@ -98,7 +85,7 @@ public class Database {
     }
 
     for (i, parameter) in parameters.enumerated() {
-      bind(parameter: parameter, at: Int32(i + 1), to: ppStmt)
+      bind(parameter: parameter?.asSqliteValue ?? .null, at: Int32(i + 1), to: ppStmt)
     }
 
     let cursor = Cursor(database: self, statement: ppStmt)
@@ -119,7 +106,7 @@ public class Database {
         // TODO: Don't make this so harsh...
         fatalError("\(name) is not a parameter in \(statement)!")
       }
-      bind(parameter: parameter, at: columnIndex, to: ppStmt)
+      bind(parameter: parameter?.asSqliteValue ?? .null, at: columnIndex, to: ppStmt)
     }
 
     let cursor = Cursor(database: self, statement: ppStmt)

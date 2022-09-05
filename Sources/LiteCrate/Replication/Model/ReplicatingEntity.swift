@@ -67,8 +67,8 @@ struct ReplicatingEntityWithMetadata {
     }
   }
 
-  func insertValues() -> [String: SqliteRepresentable?] {
-    var insertDict = [String: SqliteRepresentable?]()
+  func insertValues() -> [String: SqliteRepresentable] {
+    var insertDict = [String: SqliteRepresentable]()
     insertDict["id"] = id
     for (key, field) in fields {
       insertDict[key] = field.value
@@ -109,26 +109,26 @@ public struct ReplicatingEntity {
     guard case let .text(val) = fields[key] else { fatalError() }
     return val
   }
-
-  func bool(for key: String) -> Bool {
-    guard case let .bool(val) = fields[key] else { fatalError() }
-    return val
-  }
+//
+//  func bool(for key: String) -> Bool {
+//    guard case let .bool(val) = fields[key] else { fatalError() }
+//    return val
+//  }
 
   func data(for key: String) -> Data {
     guard case let .blob(val) = fields[key] else { fatalError() }
     return val
   }
 
-  func uuid(for key: String) -> UUID {
-    guard case let .uuid(val) = fields[key] else { fatalError() }
-    return val
-  }
-
-  func date(for key: String) -> Date {
-    guard case let .date(val) = fields[key] else { fatalError() }
-    return val
-  }
+//  func uuid(for key: String) -> UUID {
+//    guard case let .uuid(val) = fields[key] else { fatalError() }
+//    return val
+//  }
+//
+//  func date(for key: String) -> Date {
+//    guard case let .date(val) = fields[key] else { fatalError() }
+//    return val
+//  }
 
   func isNull(for key: String) -> Bool {
     guard let value = fields[key] else { fatalError() }

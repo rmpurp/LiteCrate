@@ -8,6 +8,65 @@
 import Foundation
 import LiteCrateCore
 
+protocol ColumnVisitor {
+  func visit<V: SqliteRepresentable>(_ column: SchemaColumn<V>, name: String)
+}
+
+protocol ColumnSchemaProtocol {
+  var name: String? { get }
+
+  func accept<V: ColumnVisitor>(by visitor: V, name: String)
+}
+
+public struct SchemaColumn<V: SqliteRepresentable> {
+  let name: String?
+  
+  init(_ name: String? = nil) {
+    self.name = name
+  }
+}
+
+extension SchemaColumn: ColumnSchemaProtocol {
+  func accept<V: ColumnVisitor>(by visitor: V, name: String) {
+    visitor.visit(self, name: name)
+  }
+}
+
+class CreateStatementGenerator: ColumnVisitor {
+  var mirror: Mirror
+  private var columns: [String] = []
+  
+  init(schema: Any) {
+    mirror = Mirror(reflecting: schema)
+    columns.append("id TEXT NOT NULL PRIMARY KEY")
+    for (label, column) in mirror.children {
+      if let column = column as? ColumnSchemaProtocol {
+        guard let name = column.name ?? label else { fatalError("Column has no name.") }
+        column.accept(by: self, name: name)
+      }
+    }
+  }
+  
+  func visit<V: SqliteRepresentable>(_ column: SchemaColumn<V>, name: String) {
+    columns.append("")
+  }
+}
+
+struct TestSchema {
+  let name = SchemaColumn<String>("name")
+
+  func test() {
+    let mirror = Mirror(reflecting: self)
+    for child in mirror.children {
+      if let v = child.value as? SchemaColumn<String> {
+        
+      }
+    }
+  }
+}
+
+
+
 enum SubcolumnSchema: String, CaseIterable {
   case lamport
   case sequencer
@@ -16,7 +75,7 @@ enum SubcolumnSchema: String, CaseIterable {
   var type: SQLiteType {
     switch self {
     case .lamport: return .integer
-    case .sequencer: return .uuid
+    case .sequencer: return .text
     case .sequenceNumber: return .integer
     }
   }
@@ -86,7 +145,7 @@ public struct EntitySchema {
     } catch {
       preconditionFailure()
     }
-    schema.properties[relationshipName] = PropertySchema(name: relationshipName, type: nullable ? .nullableUUID : .uuid)
+//    schema.properties[relationshipName] = PropertySchema(name: relationshipName, type: nullable ? .nullableUUID : .uuid)
     schema.relationships[relationshipName] = reference
     return schema
   }
@@ -126,50 +185,10 @@ public struct EntitySchema {
 }
 
 extension Cursor {
-  func fetch(name: String, type: SQLiteType) -> SQLiteValue? {
-    switch type {
-    case .nullableInteger:
-      guard !isNull(for: name) else { return nil }
-      fallthrough
-    case .integer:
-      return .integer(val: int(for: name))
-    case .nullableReal:
-      guard !isNull(for: name) else { return nil }
-      fallthrough
-    case .real:
-      return .real(val: double(for: name))
-    case .nullableText:
-      guard !isNull(for: name) else { return nil }
-      fallthrough
-    case .text:
-      return .text(val: string(for: name))
-    case .nullableBlob:
-      guard !isNull(for: name) else { return nil }
-      fallthrough
-    case .blob:
-      return .blob(val: data(for: name))
-    case .nullableBool:
-      guard !isNull(for: name) else { return nil }
-      fallthrough
-    case .bool:
-      return .bool(val: bool(for: name))
-    case .nullableUUID:
-      guard !isNull(for: name) else { return nil }
-      fallthrough
-    case .uuid:
-      return .uuid(val: uuid(for: name))
-    case .nullableDate:
-      guard !isNull(for: name) else { return nil }
-      fallthrough
-    case .date:
-      return .date(val: date(for: name))
-    }
-  }
-
   func entity(with schema: EntitySchema) -> ReplicatingEntity {
     var entity = ReplicatingEntity(entityType: schema.name, id: uuid(for: "id"))
     for property in schema.properties.values {
-      entity[property.name] = fetch(name: property.name, type: property.type)
+      entity[property.name] = SQLiteValue.integer(val: 0)
     }
     return entity
   }
@@ -178,7 +197,8 @@ extension Cursor {
     let id = uuid(for: "id")
     var fields: [String: CompleteFieldData] = [:]
     for property in schema.properties.values {
-      let value = fetch(name: property.name, type: property.type)
+//      let value = fetch(name: property.name, type: property.type)
+      let value = SQLiteValue.integer(val: 0)
       let lamport = int(for: "\(property.name)__lamport")
       let sequencer = uuid(for: "\(property.name)__sequencer")
       let sequenceNumber = int(for: "\(property.name)__sequenceNumber")
