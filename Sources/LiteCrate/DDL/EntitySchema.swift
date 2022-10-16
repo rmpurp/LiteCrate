@@ -9,63 +9,69 @@ import Foundation
 import LiteCrateCore
 
 protocol ColumnVisitor {
-  func visit<V: SqliteRepresentable>(_ column: SchemaColumn<V>, name: String)
+  func visit<V: SqliteRepresentable>(_ column: SchemaColumn<V>)
 }
 
-protocol ColumnSchemaProtocol {
-  var name: String? { get }
+protocol ColumnSchemaProtocol: Hashable {
+  var name: String { get }
 
-  func accept<V: ColumnVisitor>(by visitor: V, name: String)
+  func accept<V: ColumnVisitor>(visitor: V)
 }
 
-public struct SchemaColumn<V: SqliteRepresentable> {
-  let name: String?
+public protocol TableSchema {
+  var tableName: String { get }
+}
+
+public struct SchemaColumn<V: SqliteRepresentable>: ColumnSchemaProtocol {
+  let name: String
+  let referenceTable: String?
   
-  init(_ name: String? = nil) {
+  init(_ name: String) {
     self.name = name
+    self.referenceTable = nil
   }
-}
+  
+  init(_ name: String, references referenceTable: String) where V == UUID {
+    self.name = name
+    self.referenceTable = referenceTable
+  }
 
-extension SchemaColumn: ColumnSchemaProtocol {
-  func accept<V: ColumnVisitor>(by visitor: V, name: String) {
-    visitor.visit(self, name: name)
+  func accept<V: ColumnVisitor>(visitor: V) {
+    visitor.visit(self)
   }
 }
 
 class CreateStatementGenerator: ColumnVisitor {
-  var mirror: Mirror
+  private var tableName: String
   private var columns: [String] = []
   
-  init(schema: Any) {
-    mirror = Mirror(reflecting: schema)
+  init<T: TableSchema>(schema: T) {
+    tableName = schema.tableName
+    let mirror = Mirror(reflecting: schema)
     columns.append("id TEXT NOT NULL PRIMARY KEY")
-    for (label, column) in mirror.children {
-      if let column = column as? ColumnSchemaProtocol {
-        guard let name = column.name ?? label else { fatalError("Column has no name.") }
-        column.accept(by: self, name: name)
+    for (_, column) in mirror.children {
+      if let column = column as? any ColumnSchemaProtocol {
+        column.accept(visitor: self)
       }
     }
   }
   
-  func visit<V: SqliteRepresentable>(_ column: SchemaColumn<V>, name: String) {
-    columns.append("")
+  func makeCreationStatement() -> String {
+    let whitespace = "\n    "
+    
+    let columnDefinitions = columns.joined(separator: ",\(whitespace)")
+    return "CREATE TABLE \(tableName) (\(whitespace)\(columnDefinitions)\n)"
+  }
+  
+  func visit<V: SqliteRepresentable>(_ column: SchemaColumn<V>) {
+    let foreignKeyClause = column.referenceTable.flatMap { " REFERENCES \($0)(id)" } ?? ""
+    
+    columns.append("\(column.name) \(V.sqliteType.typeDefinition)\(foreignKeyClause)")
+    columns.append("\(column.name)__lamport \(Int64.sqliteType.typeDefinition)")
+    columns.append("\(column.name)__sequenceNumber \(Int64.sqliteType.typeDefinition)")
+    columns.append("\(column.name)__sequencer \(UUID.sqliteType.typeDefinition)")
   }
 }
-
-struct TestSchema {
-  let name = SchemaColumn<String>("name")
-
-  func test() {
-    let mirror = Mirror(reflecting: self)
-    for child in mirror.children {
-      if let v = child.value as? SchemaColumn<String> {
-        
-      }
-    }
-  }
-}
-
-
 
 enum SubcolumnSchema: String, CaseIterable {
   case lamport

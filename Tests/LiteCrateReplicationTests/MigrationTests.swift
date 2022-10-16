@@ -12,6 +12,19 @@ import XCTest
 @testable import LiteCrateCore
 
 final class MigrationTests: XCTestCase {
+  struct TestSchema: TableSchema {
+    var tableName = "Person"
+
+    let name = SchemaColumn<String>("name")
+    let age = SchemaColumn<Int64>("banana")
+    let dog = SchemaColumn("dog", references: "Dog")
+  }
+  
+  func testNewSchema() {
+    let generator = CreateStatementGenerator(schema: TestSchema())
+    print(generator.makeCreationStatement())
+  }
+  
   func testEntitySchema() throws {
     let schemaVersion1 = EntitySchema(name: "Person")
       .withProperty("name", type: .nullableText)
