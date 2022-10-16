@@ -25,36 +25,11 @@ public final class TransactionProxy {
     return try db.query(sql, values)
   }
 
-  func merge(_: ReplicatingEntityWithMetadata) throws {
-    guard isEnabled else {
-      fatalError("Do not use this proxy outside of the transaction closure")
-    }
-  }
-
-  public func save<T>(entityType: String, _ entity: T) throws where T: Codable & Identifiable, T.ID == UUID {
-    try save(ReplicatingEntity(entityType: entityType, object: entity))
-  }
-
-  public func save(_ entity: ReplicatingEntity) throws {
+  public func save() throws {
     guard isEnabled else {
       fatalError("Do not use this proxy outside of the transaction closure")
     }
 
-    guard let schema = liteCrate.schemas[entity.entityType] else {
-      fatalError()
-    }
-
-    if var existingEntityWithMetadata = try fetchWithMetadata(entity.entityType, with: entity.id) {
-      existingEntityWithMetadata.merge(entity, sequencer: nodeID, sequenceNumber: TEMPsequenceNumber)
-      TEMPsequenceNumber += 1
-      try db.execute(schema.insertStatement(), existingEntityWithMetadata.insertValues())
-    } else {
-      let entityWithMetadata = ReplicatingEntityWithMetadata(
-        newReplicatingEntity: entity, creator: nodeID, sequenceNumber: TEMPsequenceNumber
-      )
-      TEMPsequenceNumber += 1
-      try db.execute(schema.insertStatement(), entityWithMetadata.insertValues())
-    }
   }
 
   public func fetch<T>(_ entityType: String, type: T.Type, with id: UUID) throws -> T?
@@ -63,13 +38,6 @@ public final class TransactionProxy {
     try fetch(entityType, type: type, predicate: "id = ?", [id]).first
   }
 
-  public func fetch(_ entityType: String, with id: UUID) throws -> ReplicatingEntity? {
-    try fetch(entityType, predicate: "id = ?", [id]).first
-  }
-
-  private func fetchWithMetadata(_ entityType: String, with id: UUID) throws -> ReplicatingEntityWithMetadata? {
-    try fetchWithMetadata(entityType, predicate: "id = ?", [id]).first
-  }
 
   public func fetch<T>(_ entityType: String, type _: T.Type, predicate: String = "TRUE",
                        _ values: [SqliteRepresentable?] = []) throws -> [T]
@@ -78,124 +46,32 @@ public final class TransactionProxy {
     guard isEnabled else {
       fatalError("Do not use this proxy outside of the transaction closure")
     }
-
-    guard let schema = liteCrate.schemas[entityType] else { fatalError() }
-    let cursor = try db.query(schema.fieldsOnlySelectStatement(predicate: predicate), values)
-    let databaseDecorder = DatabaseDecoder(cursor: cursor)
-
-    var returnValue = [T]()
-    while cursor.step() {
-      try returnValue.append(T(from: databaseDecorder))
-    }
-    return returnValue
+    return []
   }
 
   public func fetch(_ entityType: String, predicate: String = "TRUE",
-                    _ values: [SqliteRepresentable?] = []) throws -> [ReplicatingEntity]
+                    _ values: [SqliteRepresentable?] = []) throws -> [String]
   {
     guard isEnabled else {
       fatalError("Do not use this proxy outside of the transaction closure")
     }
-
-    guard let schema = liteCrate.schemas[entityType] else { fatalError() }
-    let cursor = try db.query(schema.fieldsOnlySelectStatement(predicate: predicate), values)
-    var returnValue = [ReplicatingEntity]()
-    while cursor.step() {
-      returnValue.append(cursor.entity(with: schema))
-    }
-    return returnValue
+    return []
   }
 
-  func fetchWithMetadata(_ entityType: String, predicate: String = "TRUE",
-                         _: [SqliteRepresentable?] = []) throws -> [ReplicatingEntityWithMetadata]
-  {
-    guard isEnabled else {
-      fatalError("Do not use this proxy outside of the transaction closure")
-    }
-
-    guard let schema = liteCrate.schemas[entityType] else { fatalError() }
-    let cursor = try db.query(schema.fieldsOnlySelectStatement(predicate: predicate))
-    var returnValue = [ReplicatingEntityWithMetadata]()
-    while cursor.step() {
-      returnValue.append(cursor.entityWithMetadata(with: schema))
-    }
-    return returnValue
+  public func delete<T: Codable>(_: T) throws {
   }
 
-  // MARK: - Old stuff below
 
-//    guard var node = try fetch(Node.self, with: nodeID) else { return }
-//
-//    let encoder = DatabaseEncoder()
-//    try model.encode(to: encoder)
-//
-//    if var objectRecord = try fetch(ObjectRecord.self, with: model.id),
-//       let oldModel = try fetch(T.self, with: model.id)
-//    {
-//      // The model already exists; set us as the latest sequencer and bump the lamport.
-//      objectRecord.lamport += 1
-//      objectRecord.sequencer = nodeID
-//      objectRecord.sequenceNumber = node.nextSequenceNumber
-//
-//      if try foreignKeyValueHasChanged(
-//        oldModel: oldModel,
-//        newForeignKeyValues: encoder.foreignKeyValues(table: T.table)
-//      ) {
-//        // When a foreign key changes, this is considered a rebirth of the object. The reason behind this is changing a
-//        // foreign key typically signifies moving the object to a different category, etc., so if it gets concurrently
-//        // deleted on another node, the moved object does not get deleted.
-//        objectRecord.creator = nodeID
-//        objectRecord.creationNumber = node.nextCreationNumber
-//        node.nextCreationNumber += 1
-//        // TODO: Should this need to delete foreign key dependencies? My guess is no, but I need to think about the
-//        // implications. Actually, this should probably rebirth the dependencies, as well. Yikes...
-//      }
-//
-//      try save(objectRecord)
-//    } else {
-//      // The model does not exist or needs to be recreated; create a new one and bump the node's creation number.
-//      let objectRecord = ObjectRecord(id: model.id, creator: node)
-//      try save(objectRecord)
-//      node.nextCreationNumber += 1
-//    }
-//    // Regardless, we bump the node's sequence number and save it.
-//    node.nextSequenceNumber += 1
-//    try save(node)
-//
-//    try db.execute(T.table.insertStatement(), encoder.insertValues)
-
-  public func delete<T: ReplicatingModel>(_: T) throws {
-//    guard let objectRecord = try fetch(ObjectRecord.self, with: model.id) else { return }
-//    try delete(objectRecord: objectRecord)
-  }
-
-  private func mergeRangeAndDeleteMatchingModels(_ range: EmptyRange) throws {
-//    let overlappingRanges = try fetch(EmptyRange.self, where: "node = ? AND start <= ? and end >= ?",
-//                                      [range.end + 1, range.start - 1])
-//    var range = range
-//    for overlappingRange in overlappingRanges {
-//      range.start = min(range.start, overlappingRange.start)
-//      range.end = max(range.end, overlappingRange.end)
-//      try delete(overlappingRange)
-//    }
-
-    try execute("DELETE FROM ObjectRecord WHERE creator = ? AND ? <= creationNumber AND creationNumber >= ?",
-                [range.node, range.start, range.end])
-
-//    try save(range)
-  }
-
-  public func delete<T: DatabaseCodable>(_: T, where sqlWhereClause: String = "TRUE",
+  public func delete<T: Codable>(_: T, where sqlWhereClause: String = "TRUE",
                                          _ values: [SqliteRepresentable?] = []) throws
   {
-    try db.execute("DELETE FROM \(T.table.tableName) WHERE \(sqlWhereClause)", values)
+//    try db.execute("DELETE FROM \(T.table.tableName) WHERE \(sqlWhereClause)", values)
   }
 
-  public func delete<T: DatabaseCodable, U: SqliteRepresentable>(_: T.Type, with primaryKey: U) throws {
-    try db.execute("DELETE FROM \(T.table.tableName) WHERE \(T.table.primaryKeyColumn) = ?", [primaryKey])
+  public func delete<T: Codable, U: SqliteRepresentable>(_: T.Type, with primaryKey: U) throws {
+//    try db.execute("DELETE FROM \(T.table.tableName) WHERE \(T.table.primaryKeyColumn) = ?", [primaryKey])
   }
 
-  #warning(" persist sequence number, node")
   internal var liteCrate: LiteCrate
   internal var TEMPsequenceNumber: Int64 = 0
   internal var db: Database
